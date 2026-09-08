@@ -18,6 +18,15 @@ def build_pyg_graph():
         # Fallback to cleaned file
         df = pd.read_csv(csv_path)
 
+    # Derive dimensions from data
+    n_status = df["work_status_code"].nunique()
+    n_cat = df["work_category_code"].nunique()
+    max_status = df["work_status_code"].max()
+    max_cat = df["work_category_code"].max()
+
+    print(f"Status: nunique={n_status}, max={max_status}")
+    print(f"Category: nunique={n_cat}, max={max_cat}")
+
     # 2. Create node mappings
     mp_nodes = sorted(list(set(df["MP"])))
     ida_nodes = sorted(list(set(df["IDA"])))
@@ -36,11 +45,6 @@ def build_pyg_graph():
     edge_indices = []
     edge_attrs = []
 
-    # We expect 6 unique statuses and 4 unique categories as per requirements
-    # If the data has fewer, we still pad to 6 and 4.
-    n_status = 6
-    n_cat = 4
-
     for _, row in df.iterrows():
         u = mp_map[row["MP"]]
         v = ida_map[row["IDA"]]
@@ -51,17 +55,15 @@ def build_pyg_graph():
         # Feature 2: sanction_lag_days
         f_lag = row["sanction_lag_days"]
 
-        # Feature 3-8: one-hot status
+        # Feature 3-?: one-hot status
         status_code = int(row["work_status_code"])
         status_oh = [0.0] * n_status
-        if 0 <= status_code < n_status:
-            status_oh[status_code] = 1.0
+        status_oh[status_code] = 1.0
 
-        # Feature 9-12: one-hot category
+        # Feature ?-?: one-hot category
         cat_code = int(row["work_category_code"])
         cat_oh = [0.0] * n_cat
-        if 0 <= cat_code < n_cat:
-            cat_oh[cat_code] = 1.0
+        cat_oh[cat_code] = 1.0
 
         feat = [f_amount, f_lag] + status_oh + cat_oh
 
