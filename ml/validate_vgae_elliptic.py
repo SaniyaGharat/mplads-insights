@@ -1,6 +1,6 @@
 import torch
 import numpy as np
-from torch_geometric.data import Data
+from torch_geometric.datasets import EllipticBitcoinDataset
 from torch_geometric.nn import VGAE, GCNConv
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score, f1_score
@@ -20,60 +20,45 @@ class GCNEncoder(torch.nn.Module):
         # Return mu and logvar for the VGAE
         return torch.chunk(x, 2, dim=-1)
 
-def generate_synthetic_elliptic():
-    print("Generating synthetic Elliptic-like dataset...")
-    # Mimic Elliptic properties
-    n_nodes = 10000 # Reduced size for faster validation
-    n_features = 147
-
-    # Labels: 0 = licit, 1 = illicit (approx 10% illicit)
-    y = np.random.choice([0, 1], size=n_nodes, p=[0.9, 0.1])
-
-    # Features: correlate features with labels
-    x = np.random.randn(n_nodes, n_features).astype(np.float32)
-    for i in range(n_nodes):
-        if y[i] == 1:
-            x[i] += 0.5 # Shift mean for illicit nodes
-
-    # Edges: nodes of same label more likely to connect (homophily)
-    edge_list = []
-    for i in range(n_nodes):
-        # Connect to a few random nodes
-        for _ in range(3):
-            j = np.random.randint(0, n_nodes)
-            if i != j:
-                # Increase probability if same label
-                prob = 0.8 if y[i] == y[j] else 0.2
-                if np.random.rand() < prob:
-                    edge_list.append([i, j])
-
-    edge_index = torch.tensor(edge_list, dtype=torch.long).t().contiguous()
-    x = torch.tensor(x, dtype=torch.float)
-    y = torch.tensor(y, dtype=torch.long)
-
-    return Data(x=x, edge_index=edge_index, y=y)
-
 def validate_vgae():
-    # Load synthetic dataset
-    data = generate_synthetic_elliptic()
+    # 2. Load Real Elliptic Bitcoin Dataset from local raw/ folder
+    dataset = EllipticBitcoinDataset(root='./data/elliptic')
+    data = dataset[0]
 
-    # Split labels for evaluation
-    # VGAE is trained on ALL nodes unsupervised.
-    indices = np.arange(data.num_nodes)
-    train_idx, test_idx = train_test_split(indices, test_size=0.3, stratify=data.y.numpy(), random_state=42)
+    # 3. Print Dataset Stats
+    y = data.y.numpy()
+    num_licit = np.sum(y == 0)
+    num_illicit = np.sum(y == 1)
+    num_unknown = np.sum(y == 2)
 
-    # 2. Initialize VGAE
+    print("\n" + "="*30)
+    print("Dataset Sanity Check")
+    print("="*30)
+    print(f"Num Nodes: {data.num_nodes}")
+    print(f"Num Edges: {data.num_edges}")
+    print(f"Num Features: {data.num_node_features}")
+    print(f"Licit: {num_licit}")
+    print(f"Illicit: {num_illicit}")
+    print(f"Unknown: {num_unknown}")
+    print("="*30 + "\n")
+
+    # Filter labeled nodes for evaluation
+    mask_labeled = (data.y != 2)
+    y_true = data.y[mask_labeled].numpy()
+    labeled_indices = np.where(mask_labeled)[0]
+
+    # 4. Initialize VGAE
     in_channels = data.num_node_features
-    out_channels = 16
+    out_channels = 16 # Embedding size
 
     encoder = GCNEncoder(in_channels, out_channels)
     model = VGAE(encoder)
 
     optimizer = torch.optim.Adam(model.parameters(), lr=0.01)
 
-    # 3. Unsupervised Training
+    # 5. Unsupervised Training
     epochs = 100
-    print("\nTraining VGAE unsupervised...")
+    print("Training VGAE unsupervised...")
     losses = []
 
     model.train()
@@ -87,17 +72,21 @@ def validate_vgae():
         if (epoch + 1) % 20 == 0 or epoch == 0:
             print(f"Epoch {epoch+1:03d}/{epochs} | Loss: {loss.item():.4f}")
 
-    # 4. Evaluation
+    # 6. Evaluation
     model.eval()
     with torch.no_grad():
+        # Use the encoder directly to get mu (the mean of the latent distribution)
         mu, _ = model.encoder(data.x, data.edge_index)
         embeddings = mu.numpy()
 
-    # Separate into train/test for the downstream classifier
-    X_train = embeddings[train_idx]
-    y_train = data.y[train_idx].numpy()
-    X_test = embeddings[test_idx]
-    y_test = data.y[test_idx].numpy()
+    # Filter embeddings to only include labeled nodes
+    X_eval = embeddings[labeled_indices]
+    y_eval = y_true
+
+    # Train a simple downstream classifier on a subset of labeled embeddings
+    X_train, X_test, y_train, y_test = train_test_split(
+        X_eval, y_eval, test_size=0.3, stratify=y_eval, random_state=42
+    )
 
     clf = LogisticRegression(max_iter=1000)
     clf.fit(X_train, y_train)
@@ -108,11 +97,11 @@ def validate_vgae():
     auprc = average_precision_score(y_test, y_pred_prob)
     f1 = f1_score(y_test, y_pred)
 
-    # 5. Baseline AUPRC (positive class ratio)
-    pos_ratio = np.sum(data.y.numpy() == 1) / len(data.y)
+    # 7. Baseline AUPRC (positive class ratio)
+    pos_ratio = np.sum(y_true == 1) / len(y_true)
 
     print("\n" + "="*30)
-    print("VGAE Synthetic Validation Results")
+    print("VGAE Real Elliptic Results")
     print("="*30)
     print(f"Final Training Loss: {losses[-1]:.4f}")
     print(f"AUPRC: {auprc:.4f}")

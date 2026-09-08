@@ -17,6 +17,7 @@ frontend/dist/
 
 # Large external datasets
 data/elliptic/raw/
+data/elliptic/processed/
 
 # OS files
 .DS_Store
