@@ -15,6 +15,9 @@ frontend/dist/
 !.env.example
 .vscode/
 
+# Large external datasets
+data/elliptic/raw/
+
 # OS files
 .DS_Store
 Thumbs.db
