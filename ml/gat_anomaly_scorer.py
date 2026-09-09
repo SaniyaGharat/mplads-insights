@@ -79,10 +79,9 @@ def run_gat_anomaly_detection():
     data['mp'].x = mp_x
     data['ida'].x = ida_x
 
-    # Use homogeneous conversion
     data_homo = data.to_homogeneous()
 
-    # MANUALLY create undirected edges to preserve original order and avoid ToUndirected() deduplication
+    # MANUALLY create undirected edges to preserve original order
     orig_index = data_homo.edge_index
     orig_attr = data_homo.edge_attr
     rev_index = orig_index[[1, 0], :]
@@ -90,7 +89,6 @@ def run_gat_anomaly_detection():
     edge_index = torch.cat([orig_index, rev_index], dim=1)
     edge_attr = torch.cat([orig_attr, rev_attr], dim=0)
 
-    # Standardize edge attributes
     edge_mean = edge_attr.mean(dim=0)
     edge_std = edge_attr.std(dim=0) + 1e-7
     edge_attr_norm = (edge_attr - edge_mean) / edge_std

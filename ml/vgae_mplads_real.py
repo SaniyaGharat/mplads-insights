@@ -5,6 +5,12 @@ from torch_geometric.nn import VGAE, GCNConv
 from torch_geometric.data import HeteroData
 import torch.nn.functional as F
 
+# Set random seeds for reproducibility
+torch.manual_seed(42)
+np.random.seed(42)
+
+# 1. Encoder Architecture (EXACT SAME as ml/validate_vgae_elliptic.py)
+
 # 1. Encoder Architecture (EXACT SAME as ml/validate_vgae_elliptic.py)
 class GCNEncoder(torch.nn.Module):
     def __init__(self, in_channels, out_channels):

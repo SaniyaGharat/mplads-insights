@@ -1,10 +1,17 @@
 import torch
 import numpy as np
+import pandas as pd
 from torch_geometric.datasets import EllipticBitcoinDataset
 from torch_geometric.nn import VGAE, GCNConv
 from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import average_precision_score, f1_score
 from sklearn.model_selection import train_test_split
+
+# Set random seeds for reproducibility
+torch.manual_seed(42)
+np.random.seed(42)
+
+# 1. Encoder Architecture
 
 # 1. Encoder Architecture
 class GCNEncoder(torch.nn.Module):
