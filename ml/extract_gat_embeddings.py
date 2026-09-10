@@ -3,31 +3,21 @@ import numpy as np
 import pandas as pd
 from torch_geometric.nn import GATv2Conv
 from torch_geometric.data import HeteroData
-from torch_geometric.transforms import ToUndirected
 import torch.nn.functional as F
 
-# 1. GAT Encoder Architecture
+# Reuse the exact architecture from gat_anomaly_scorer.py
 class GATEncoder(torch.nn.Module):
     def __init__(self, in_channels, hidden_channels, out_channels, edge_dim):
         super(GATEncoder, self).__init__()
         self.conv1 = GATv2Conv(in_channels, hidden_channels, edge_dim=edge_dim)
         self.conv2 = GATv2Conv(hidden_channels, out_channels, edge_dim=edge_dim)
 
-    def forward(self, x, edge_index, edge_attr, return_attention=False):
-        if return_attention:
-            x, (edge_index_1, att1) = self.conv1(x, edge_index, edge_attr, return_attention_weights=True)
-        else:
-            x = self.conv1(x, edge_index, edge_attr)
+    def forward(self, x, edge_index, edge_attr):
+        x = self.conv1(x, edge_index, edge_attr)
         x = F.relu(x)
-        if return_attention:
-            x, (edge_index_2, att2) = self.conv2(x, edge_index, edge_attr, return_attention_weights=True)
-        else:
-            x = self.conv2(x, edge_index, edge_attr)
-        if return_attention:
-            return x, (edge_index_2, att2)
+        x = self.conv2(x, edge_index, edge_attr)
         return x
 
-# 2. Edge Reconstructor (Decoder)
 class EdgeReconstructor(torch.nn.Module):
     def __init__(self, node_dim, edge_dim):
         super(EdgeReconstructor, self).__init__()
@@ -41,7 +31,7 @@ class EdgeReconstructor(torch.nn.Module):
         combined = torch.cat([z_u, z_v], dim=-1)
         return self.mlp(combined)
 
-def run_gat_anomaly_detection():
+def extract_embeddings():
     print("Loading MPLADS hetero graph...")
     data = torch.load('ml/mplads_hetero_graph.pt', weights_only=False)
 
@@ -80,8 +70,6 @@ def run_gat_anomaly_detection():
     data['ida'].x = ida_x
 
     data_homo = data.to_homogeneous()
-
-    # MANUALLY create undirected edges to preserve original order
     orig_index = data_homo.edge_index
     orig_attr = data_homo.edge_attr
     rev_index = orig_index[[1, 0], :]
@@ -116,7 +104,6 @@ def run_gat_anomaly_detection():
     epochs = 100
 
     print("Training GAT unsupervised...")
-    losses = []
     model.train()
     for epoch in range(epochs):
         optimizer.zero_grad()
@@ -126,95 +113,23 @@ def run_gat_anomaly_detection():
         loss = F.mse_loss(e_hat, edge_attr_norm)
         loss.backward()
         optimizer.step()
-        losses.append(loss.item())
         if (epoch + 1) % 20 == 0 or epoch == 0:
             print(f"Epoch {epoch+1:03d}/{epochs} | Loss: {loss.item():.4f}")
 
     model.eval()
     with torch.no_grad():
         z = model.encoder(data_homo.x, edge_index, edge_attr_norm)
-        u, v = edge_index
-        e_hat = model.reconstructor(z[u], z[v])
-        edge_errors = torch.sum((edge_attr_norm - e_hat)**2, dim=1)
-        errors_np = edge_errors.numpy()
+        # Corrected per-work embedding: [z_u, z_v, edge_attr_norm]
+        original_num_edges = 15000
+        u_orig = edge_index[0, :original_num_edges]
+        v_orig = edge_index[1, :original_num_edges]
+        e_attr_orig = edge_attr_norm[:original_num_edges]
 
-    original_num_edges = 15000
-    original_errors = errors_np[:original_num_edges]
-    np.save('ml/gat_scores.npy', original_errors)
-    print(f"Saved anomaly scores to ml/gat_scores.npy")
+        work_embeddings = torch.cat([z[u_orig], z[v_orig], e_attr_orig], dim=-1)
+        embeddings_np = work_embeddings.numpy()
 
-
-    top_50_idx = np.argsort(original_errors)[-50:][::-1]
-    unique_pairs = set()
-    for idx in top_50_idx:
-        u, v = edge_index[:, idx]
-        unique_pairs.add(tuple(sorted((int(u), int(v)))))
-
-    print("\n" + "="*30)
-    print("GAT Structural Analysis")
-    print("="*30)
-    print(f"Top 50 high-error edges represent {len(unique_pairs)} unique node pairs.")
-    print("="*30 + "\n")
-
-    df_works = pd.read_csv("data/works_sanctioned_clean.csv")
-    top_15_idx = np.argsort(original_errors)[-15:][::-1]
-
-    print("Top 15 Highest-Anomaly Works (GAT):")
-    print(f"{'Rank':<5} | {'Score':<10} | {'MP':<15} | {'IDA':<15} | {'Amount':<12} | {'Lag':<8} | {'Status':<10}")
-    print("-" * 85)
-    for rank, idx in enumerate(top_15_idx, 1):
-        row = df_works.iloc[idx]
-        print(f"{rank:<5} | {original_errors[idx]:<10.4f} | {row['MP']:<15} | {row['IDA']:<15} | {row['sanction_amount']:<12.2f} | {int(row['sanction_lag_days']):<8} | {row['work_status_code']:<10}")
-
-    print("\n" + "="*30)
-    print("Explainability Analysis")
-    print("="*30)
-
-    mp_nodes = sorted(list(set(df_works["MP"])))
-    ida_nodes = sorted(list(set(df_works["IDA"])))
-
-    found_example = False
-    for rank in range(1, 11):
-        best_idx = top_15_idx[rank-1]
-        u_top = edge_index[0, best_idx]
-
-        z_final, (edge_idx_att, weights_att) = model.encoder(data_homo.x, edge_index, edge_attr_norm, return_attention=True)
-        if isinstance(weights_att, tuple):
-            weights_att = torch.stack(weights_att).mean(dim=0)
-
-        mask = edge_idx_att[1] == u_top
-        incident_edges = edge_idx_att[0][mask]
-        incident_weights = weights_att[mask]
-
-        non_self_mask = incident_edges != u_top
-        filtered_edges = incident_edges[non_self_mask]
-        filtered_weights = incident_weights[non_self_mask]
-
-        if len(filtered_edges) >= 1:
-            print(f"Analyzing Rank {rank} Anomaly: Work index {best_idx}")
-            print(f"Node {u_top.item()} (MP/IDA) top neighbors (excluding self):")
-
-            weights_flat = filtered_weights.view(-1)
-            k_val = min(3, weights_flat.size(0))
-            if k_val > 0:
-                top_vals, top_idx = torch.topk(weights_flat, k=k_val)
-                for i in range(top_vals.shape[0]):
-                    neighbor_idx = filtered_edges[top_idx[i]].item()
-                    name = "Unknown"
-                    if neighbor_idx < mp_nodes_count:
-                        name = mp_nodes[neighbor_idx]
-                    elif neighbor_idx < (mp_nodes_count + ida_nodes_count):
-                        name = ida_nodes[neighbor_idx - mp_nodes_count]
-                    print(f"Neighbor: {name[:20]:<20} | Weight: {top_vals[i].item():.4f}")
-            else:
-                print("No non-self neighbors found.")
-
-            found_example = True
-            break
-
-    if not found_example:
-        print("Could not find a top-anomaly with non-self neighbors.")
-    print("="*30)
+    np.save('ml/gat_embeddings.npy', embeddings_np)
+    print(f"Saved embeddings for 15,000 works to ml/gat_embeddings.npy. Shape: {embeddings_np.shape}")
 
 if __name__ == "__main__":
-    run_gat_anomaly_detection()
+    extract_embeddings()
