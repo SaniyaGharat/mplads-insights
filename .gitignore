@@ -9,6 +9,7 @@ backend_log.txt
 # Frontend dependencies and build output
 frontend/node_modules/
 frontend/dist/
+frontend/frontend/
 
 # Local settings and environment files
 .claude/

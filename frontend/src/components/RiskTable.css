@@ -1,0 +1,125 @@
+.risk-table-container {
+  padding: 20px;
+  font-family: system-ui, -apple-system, sans-serif;
+}
+
+.table-controls {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.method-toggle {
+  display: flex;
+  gap: 8px;
+  background: #eee;
+  padding: 4px;
+  border-radius: 8px;
+}
+
+.method-toggle button {
+  border: none;
+  background: transparent;
+  padding: 6px 16px;
+  cursor: pointer;
+  border-radius: 6px;
+  font-weight: 500;
+  transition: all 0.2s;
+}
+
+.method-toggle button.active {
+  background: white;
+  box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.pagination {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.pagination button {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 6px 12px;
+  cursor: pointer;
+  border: 1px solid #ccc;
+  background: white;
+  border-radius: 4px;
+}
+
+.pagination button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.table-wrapper {
+  overflow-x: auto;
+  border: 1px solid #eee;
+  border-radius: 8px;
+}
+
+.risk-table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 14px;
+}
+
+.risk-table th {
+  background: #f8f9fa;
+  padding: 12px;
+  border-bottom: 2px solid #eee;
+  font-weight: 600;
+  color: #666;
+}
+
+.risk-table td {
+  padding: 12px;
+  border-bottom: 1px solid #eee;
+}
+
+.clickable-row {
+  cursor: pointer;
+  transition: background 0.1s;
+}
+
+.clickable-row:hover {
+  background: #f0f7ff;
+}
+
+.score-cell {
+  font-family: monospace;
+  font-weight: 600;
+}
+
+.badge {
+  padding: 2px 8px;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  display: inline-block;
+  text-align: center;
+  min-width: 80px;
+}
+
+.bg-blue-100 { background-color: #dbeafe; }
+.text-blue-800 { color: #1e40af; }
+.border-blue-200 { border-color: #bfdbfe; }
+
+.bg-purple-100 { background-color: #f3e8ff; }
+.text-purple-800 { color: #6b21a8; }
+.border-purple-200 { border-color: #e9d5ff; }
+
+.bg-gray-100 { background-color: #f3f4f6; }
+.text-gray-800 { color: #1f2937; }
+.border-gray-200 { border-color: #e5e7eb; }
+
+.loading {
+  text-align: center;
+  padding: 40px;
+  color: #666;
+}

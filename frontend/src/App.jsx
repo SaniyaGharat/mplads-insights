@@ -1,18 +1,27 @@
-import React from 'react'
+import React, { useState } from 'react';
+import RiskTable from './components/RiskTable';
+import './App.css';
 
 function App() {
+  const [selectedRow, setSelectedRow] = useState(null);
+
   return (
-    <div style={{
-      display: 'flex',
-      justifyContent: 'center',
-      alignItems: 'center',
-      height: '100vh',
-      fontFamily: 'sans-serif',
-      textAlign: 'center'
-    }}>
-      <h1>MPLADS Anomaly Detection -- Dashboard Coming Soon</h1>
+    <div className="app-container">
+      <header className="app-header">
+        <h1>MPLADS Fraud Detection Dashboard</h1>
+      </header>
+      <main>
+        <RiskTable onRowClick={setSelectedRow} />
+        <div className="details-panel">
+          {selectedRow ? (
+            <div>Selected: {selectedRow.work_index}</div>
+          ) : (
+            <div className="placeholder">Select a row to see details</div>
+          )}
+        </div>
+      </main>
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
