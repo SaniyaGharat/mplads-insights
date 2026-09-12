@@ -175,7 +175,8 @@ def run_siamese_training(capacity='full', epochs=100, weight_decay=1e-4):
         'top_15': results,
         'discovered': discovered_count,
         'final_loss': train_losses[-1],
-        'unique_dists': len(np.unique(np.round(np.sort(distances)[:50], 6)))
+        'unique_dists': len(np.unique(np.round(np.sort(distances)[:50], 6))),
+        'model': proj_head
     }
 
 if __name__ == "__main__":
@@ -193,6 +194,10 @@ if __name__ == "__main__":
 
     # Report the best results for the table
     best = res1 if res1['held_out_c5'] > res2['held_out_c5'] else res2
+
+    # Save the best model
+    torch.save(best['model'].state_dict(), 'ml/siamese_model.pth')
+    print(f"\nBest model saved to ml/siamese_model.pth")
 
     print("\n" + "="*60)
     print("Corrected Top 15 Works by Siamese Similarity")

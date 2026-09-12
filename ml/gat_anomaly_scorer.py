@@ -130,6 +130,7 @@ def run_gat_anomaly_detection():
         if (epoch + 1) % 20 == 0 or epoch == 0:
             print(f"Epoch {epoch+1:03d}/{epochs} | Loss: {loss.item():.4f}")
 
+    # ... existing code ...
     model.eval()
     with torch.no_grad():
         z = model.encoder(data_homo.x, edge_index, edge_attr_norm)
@@ -142,6 +143,7 @@ def run_gat_anomaly_detection():
     original_errors = errors_np[:original_num_edges]
     np.save('ml/gat_scores.npy', original_errors)
     print(f"Saved anomaly scores to ml/gat_scores.npy")
+
 
 
     top_50_idx = np.argsort(original_errors)[-50:][::-1]
@@ -166,6 +168,7 @@ def run_gat_anomaly_detection():
         row = df_works.iloc[idx]
         print(f"{rank:<5} | {original_errors[idx]:<10.4f} | {row['MP']:<15} | {row['IDA']:<15} | {row['sanction_amount']:<12.2f} | {int(row['sanction_lag_days']):<8} | {row['work_status_code']:<10}")
 
+    # ... existing code ...
     print("\n" + "="*30)
     print("Explainability Analysis")
     print("="*30)
@@ -173,8 +176,22 @@ def run_gat_anomaly_detection():
     mp_nodes = sorted(list(set(df_works["MP"])))
     ida_nodes = sorted(list(set(df_works["IDA"])))
 
+    # SAVE MODEL AND DATA FOR BACKEND
+    torch.save({
+        'model_state': model.state_dict(),
+        'data_homo_x': data_homo.x,
+        'edge_index': edge_index,
+        'edge_attr_norm': edge_attr_norm,
+        'mp_nodes_count': mp_nodes_count,
+        'ida_nodes_count': ida_nodes_count,
+        'mp_nodes': mp_nodes,
+        'ida_nodes': ida_nodes,
+    }, 'ml/gat_model_artifacts.pth')
+    print(f"Saved GAT model and data to ml/gat_model_artifacts.pth")
+
     found_example = False
     for rank in range(1, 11):
+
         best_idx = top_15_idx[rank-1]
         u_top = edge_index[0, best_idx]
 

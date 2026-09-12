@@ -3,6 +3,7 @@ venv/
 __pycache__/
 *.py[cod]
 .pytest_cache/
+*.log
 
 # Frontend dependencies and build output
 frontend/node_modules/
