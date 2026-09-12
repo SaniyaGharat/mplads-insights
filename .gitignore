@@ -4,6 +4,7 @@ __pycache__/
 *.py[cod]
 .pytest_cache/
 *.log
+backend_log.txt
 
 # Frontend dependencies and build output
 frontend/node_modules/
