@@ -124,6 +124,89 @@ class LabelRequest(BaseModel):
     work_index: int
     label: str
 
+@app.get("/api/stats")
+async def get_stats():
+    df_works = DATA['df_works']
+    gat_scores = DATA['gat_scores']
+    labels_df = DATA['labels_df']
+
+    total_works = len(df_works)
+    total_amount = float(df_works['sanction_amount'].sum())
+    avg_lag_days = float(df_works['sanction_lag_days'].mean())
+
+    # label_counts
+    labeled_indices = set(labels_df['work_index'].tolist())
+    gat_top_15 = set(np.argsort(gat_scores)[-15:])
+
+    training_label_count = 0
+    gat_top_count = 0
+    new_count = 0
+
+    for idx in range(total_works):
+        if idx in labeled_indices:
+            training_label_count += 1
+        elif idx in gat_top_15:
+            gat_top_count += 1
+        else:
+            new_count += 1
+
+    label_counts = {
+        "training_label": training_label_count,
+        "gat_top": gat_top_count,
+        "new": new_count
+    }
+
+    # status_breakdown
+    status_counts = df_works['Work Status'].value_counts()
+    status_breakdown = [{"status": s, "count": int(c)} for s, c in status_counts.items()]
+
+    # score_distribution
+    n_buckets = 10
+    percentiles = np.linspace(0, 100, n_buckets + 1)
+    bin_edges = np.percentile(gat_scores, percentiles)
+    counts, bins = np.histogram(gat_scores, bins=bin_edges)
+    score_distribution = []
+    for i in range(len(counts)):
+        bucket = f"{bins[i]:.1f}-{bins[i+1]:.1f}"
+        score_distribution.append({"bucket": bucket, "count": int(counts[i])})
+
+    # top_risky_mps
+    # Consistent flagged definition: Training labels OR GAT Top 15
+    flagged_indices = labeled_indices.union(gat_top_15)
+    flagged_mask = np.zeros(total_works, dtype=bool)
+    flagged_mask[list(flagged_indices)] = True
+
+    df_flagged = df_works[flagged_mask]
+    mp_stats = df_flagged.groupby('MP').agg(
+        flagged_count=('sanction_amount', 'count'),
+        total_flagged_amount=('sanction_amount', 'sum')
+    ).reset_index()
+
+    top_risky_mps = mp_stats.sort_values('flagged_count', ascending=False).head(10)
+    top_risky_mps_list = [
+        {"MP": row['MP'], "flagged_count": int(row['flagged_count']), "total_flagged_amount": float(row['total_flagged_amount'])}
+        for _, row in top_risky_mps.iterrows()
+    ]
+
+    # avg_lag_flagged_vs_normal
+    flagged_avg_lag = float(df_works.loc[flagged_mask, 'sanction_lag_days'].mean())
+    normal_avg_lag = float(df_works.loc[~flagged_mask, 'sanction_lag_days'].mean())
+
+    return {
+        "total_works": total_works,
+        "total_amount": total_amount,
+        "avg_lag_days": avg_lag_days,
+        "label_counts": label_counts,
+        "status_breakdown": status_breakdown,
+        "score_distribution": score_distribution,
+        "top_risky_mps": top_risky_mps_list,
+        "avg_lag_flagged_vs_normal": {
+            "flagged_avg_lag": flagged_avg_lag,
+            "normal_avg_lag": normal_avg_lag
+        }
+    }
+
+
 @app.get("/api/risk-scores")
 async def get_risk_scores(method: str = "gat", page: int = 1, page_size: int = 50):
     scores = DATA['gat_scores'] if method == "gat" else DATA['siamese_scores']
