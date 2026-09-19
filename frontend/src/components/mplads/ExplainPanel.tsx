@@ -1,14 +1,16 @@
 import { formatINR, type ExplainResponse, type LabelValue, type RiskRow } from "@/lib/api";
+import { cn } from "@/lib/utils";
 
 interface Props {
   row: RiskRow | null;
   explain: ExplainResponse | null;
   isLoading: boolean;
   isMock: boolean;
+  feedback?: { status: "success" | "duplicate" | "error"; message: string } | null;
   onLabel: (workIndex: number, label: LabelValue) => void;
 }
 
-export function ExplainPanel({ row, explain, isLoading, isMock, onLabel }: Props) {
+export function ExplainPanel({ row, explain, isLoading, isMock, feedback, onLabel }: Props) {
   if (!row) {
     return (
       <div className="border border-border bg-card p-5 text-sm text-muted-foreground">
@@ -73,25 +75,41 @@ export function ExplainPanel({ row, explain, isLoading, isMock, onLabel }: Props
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2 border-t border-border bg-secondary/50 px-5 py-3">
-        <button
-          onClick={() => onLabel(row.work_index, "s")}
-          className="border border-alert/50 bg-alert/10 px-3 py-1.5 text-xs font-medium text-alert hover:bg-alert/20"
-        >
-          Mark Suspicious
-        </button>
-        <button
-          onClick={() => onLabel(row.work_index, "n")}
-          className="border border-ok/50 bg-ok/10 px-3 py-1.5 text-xs font-medium text-ok hover:bg-ok/20"
-        >
-          Mark Normal
-        </button>
-        <button
-          onClick={() => onLabel(row.work_index, "skip")}
-          className="border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted"
-        >
-          Skip
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-secondary/50 px-5 py-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            onClick={() => onLabel(row.work_index, "s")}
+            className="border border-alert/50 bg-alert/10 px-3 py-1.5 text-xs font-medium text-alert hover:bg-alert/20 cursor-pointer"
+          >
+            Mark Suspicious
+          </button>
+          <button
+            onClick={() => onLabel(row.work_index, "n")}
+            className="border border-ok/50 bg-ok/10 px-3 py-1.5 text-xs font-medium text-ok hover:bg-ok/20 cursor-pointer"
+          >
+            Mark Normal
+          </button>
+          <button
+            onClick={() => onLabel(row.work_index, "skip")}
+            className="border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted cursor-pointer"
+          >
+            Skip
+          </button>
+        </div>
+        {feedback && (
+          <span
+            className={cn(
+              "text-xs font-medium tracking-wide",
+              feedback.status === "duplicate"
+                ? "text-amber-500 font-semibold"
+                : feedback.status === "success"
+                ? "text-ok"
+                : "text-destructive"
+            )}
+          >
+            {feedback.message}
+          </span>
+        )}
       </div>
     </div>
   );

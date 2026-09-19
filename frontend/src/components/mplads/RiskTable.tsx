@@ -24,11 +24,12 @@ interface Props {
   offset: number;
   selected: number | null;
   isLoading: boolean;
+  rowFeedback?: Record<number, { status: "success" | "duplicate" | "error"; message: string }>;
   onSelect: (row: RiskRow) => void;
   onLabel: (workIndex: number, label: LabelValue) => void;
 }
 
-export function RiskTable({ rows, offset, selected, isLoading, onSelect, onLabel }: Props) {
+export function RiskTable({ rows, offset, selected, isLoading, rowFeedback, onSelect, onLabel }: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-[13px]">
@@ -57,6 +58,7 @@ export function RiskTable({ rows, offset, selected, isLoading, onSelect, onLabel
         <tbody className={cn(isLoading && "opacity-50")}>
           {rows.map((row, i) => {
             const isSelected = selected === row.work_index;
+            const feedback = rowFeedback?.[row.work_index];
             return (
               <tr
                 key={row.work_index}
@@ -90,14 +92,14 @@ export function RiskTable({ rows, offset, selected, isLoading, onSelect, onLabel
                   <LabelBadge value={row.label_status} />
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">
-                  <div className="flex gap-1">
+                  <div className="flex items-center gap-1.5">
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
                         onLabel(row.work_index, "s");
                       }}
                       title="Mark suspicious"
-                      className="w-6 border border-alert/40 py-0.5 text-[11px] font-medium text-alert hover:bg-alert/10"
+                      className="w-6 border border-alert/40 py-0.5 text-[11px] font-medium text-alert hover:bg-alert/10 cursor-pointer"
                     >
                       S
                     </button>
@@ -107,10 +109,24 @@ export function RiskTable({ rows, offset, selected, isLoading, onSelect, onLabel
                         onLabel(row.work_index, "n");
                       }}
                       title="Mark normal"
-                      className="w-6 border border-ok/40 py-0.5 text-[11px] font-medium text-ok hover:bg-ok/10"
+                      className="w-6 border border-ok/40 py-0.5 text-[11px] font-medium text-ok hover:bg-ok/10 cursor-pointer"
                     >
                       N
                     </button>
+                    {feedback && (
+                      <span
+                        className={cn(
+                          "ml-1 text-[11px] font-medium",
+                          feedback.status === "duplicate"
+                            ? "text-amber-500 font-semibold"
+                            : feedback.status === "success"
+                            ? "text-ok"
+                            : "text-destructive"
+                        )}
+                      >
+                        {feedback.message}
+                      </span>
+                    )}
                   </div>
                 </td>
               </tr>

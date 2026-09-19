@@ -58,6 +58,7 @@ DATA = {}
 @app.on_event("startup")
 async def startup_event():
     print("Loading artifacts...")
+    print("Labels CSV absolute path:", os.path.abspath('ml/anomaly_labels.csv'))
     # 1. Load Base Data
     df_works = pd.read_csv('data/works_sanctioned_clean.csv')
     labels_df = pd.read_csv('ml/anomaly_labels.csv')
@@ -339,6 +340,16 @@ async def explain_work(work_index: int):
 
     return {"work_index": work_index, "top_neighbors": neighbors}
 
+@app.get("/api/label-totals")
+async def get_label_totals():
+    labels_df = pd.read_csv('ml/anomaly_labels.csv')
+    counts = labels_df['label'].value_counts().to_dict()
+    return {
+        "s": int(counts.get('s', 0)),
+        "n": int(counts.get('n', 0)),
+        "skip": int(counts.get('skip', 0))
+    }
+
 @app.post("/api/label")
 async def add_label(req: LabelRequest):
     # Input Validation
@@ -347,6 +358,11 @@ async def add_label(req: LabelRequest):
 
     if req.label not in ["s", "n", "skip"]:
         raise HTTPException(status_code=400, detail="label must be one of 's', 'n', or 'skip'")
+
+    # Duplicate check: Prevent adding the same work_index twice
+    labels_df = pd.read_csv('ml/anomaly_labels.csv')
+    if req.work_index in labels_df['work_index'].values:
+        raise HTTPException(status_code=409, detail="This record has already been labeled")
 
     # Append to CSV
     with open('ml/anomaly_labels.csv', 'a') as f:

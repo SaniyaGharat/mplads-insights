@@ -1,11 +1,12 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   fetchExplain,
   fetchGraph,
   fetchRiskScores,
   fetchStats,
+  fetchLabelTotals,
   postLabel,
   type LabelTotals,
   type LabelValue,
@@ -44,6 +45,15 @@ function Dashboard() {
   const [page, setPage] = useState(1);
   const [selected, setSelected] = useState<RiskRow | null>(null);
   const [totals, setTotals] = useState<LabelTotals>({ s: 0, n: 0, skip: 0 });
+  const [rowFeedback, setRowFeedback] = useState<
+    Record<number, { status: "success" | "duplicate" | "error"; message: string }>
+  >({});
+
+  useEffect(() => {
+    fetchLabelTotals().then(res => {
+      if (res.data) setTotals(res.data);
+    });
+  }, []);
 
   const scores = useQuery({
     queryKey: ["risk-scores", method, page],
@@ -64,7 +74,48 @@ function Dashboard() {
   const label = useMutation({
     mutationFn: ({ workIndex, value }: { workIndex: number; value: LabelValue }) =>
       postLabel(workIndex, value),
-    onSuccess: (res) => setTotals(res.data.totals),
+    onSuccess: (res, variables) => {
+      if (res.data?.totals) {
+        setTotals(res.data.totals);
+      }
+      setRowFeedback((prev) => ({
+        ...prev,
+        [variables.workIndex]: {
+          status: "success",
+          message:
+            variables.value === "s"
+              ? "Marked Suspicious"
+              : variables.value === "n"
+              ? "Marked Normal"
+              : "Skipped",
+        },
+      }));
+      scores.refetch();
+      stats.refetch();
+    },
+    onError: (error: any, variables) => {
+      if (
+        error?.status === 409 ||
+        error?.message?.toLowerCase().includes("already") ||
+        error?.message?.includes("409")
+      ) {
+        setRowFeedback((prev) => ({
+          ...prev,
+          [variables.workIndex]: {
+            status: "duplicate",
+            message: "Already labeled",
+          },
+        }));
+      } else {
+        setRowFeedback((prev) => ({
+          ...prev,
+          [variables.workIndex]: {
+            status: "error",
+            message: error?.message || "Failed to label",
+          },
+        }));
+      }
+    },
   });
 
   const rows = scores.data?.data.data ?? [];
@@ -167,6 +218,7 @@ function Dashboard() {
               offset={(page - 1) * PAGE_SIZE}
               selected={selected?.work_index ?? null}
               isLoading={scores.isFetching}
+              rowFeedback={rowFeedback}
               onSelect={setSelected}
               onLabel={onLabel}
             />
@@ -214,6 +266,7 @@ function Dashboard() {
             explain={explain.data?.data ?? null}
             isLoading={explain.isFetching}
             isMock={explain.data?.source === "mock"}
+            feedback={selected ? rowFeedback[selected.work_index] : null}
             onLabel={onLabel}
           />
         </aside>

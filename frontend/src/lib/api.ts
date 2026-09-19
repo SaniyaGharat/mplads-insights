@@ -54,6 +54,19 @@ export interface LabelTotals {
   skip: number;
 }
 
+export async function fetchLabelTotals(): Promise<Sourced<LabelTotals>> {
+  try {
+    const data = await getJson<LabelTotals>(`/label-totals`);
+    return { data, source: "live" };
+  } catch (e) {
+    return {
+      data: { s: 0, n: 0, skip: 0 },
+      source: "mock",
+      error: (e as Error).message,
+    };
+  }
+}
+
 export interface LabelResponse {
   status: string;
   totals: LabelTotals;
@@ -123,9 +136,27 @@ export async function postLabel(
       headers: { "Content-Type": "application/json", Accept: "application/json" },
       body: JSON.stringify({ work_index: workIndex, label }),
     });
-    if (!res.ok) throw new Error(`${res.status} ${res.statusText}`);
+    if (res.status === 409) {
+      const data = await res.json().catch(() => ({}));
+      const error = new Error(data.detail || "Already labeled");
+      (error as any).status = 409;
+      throw error;
+    }
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}));
+      const error = new Error(data.detail || `${res.status} ${res.statusText}`);
+      (error as any).status = res.status;
+      throw error;
+    }
     return { data: (await res.json()) as LabelResponse, source: "live" };
-  } catch (e) {
+  } catch (e: any) {
+    if (e?.status === 409 || e?.message?.includes("already been labeled") || e?.message?.includes("Already labeled")) {
+      throw e;
+    }
+    // Only fall back to mock when offline/network failure
+    if (e?.status && e.status !== 0) {
+      throw e;
+    }
     mockTotals[label] += 1;
     return {
       data: { status: "success", totals: { ...mockTotals } },
