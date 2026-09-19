@@ -52,11 +52,11 @@ pip install fastapi uvicorn pandas numpy scikit-learn networkx pydantic requests
 ```
 
 ### Step 3: Required Data Layout
-Ensure the following directory structure is present:
+Ensure the following raw input and baseline label files are present:
 ```text
 atml_project/
 ├── data/
-│   ├── works_sanctioned_clean.csv    # 15,000 cleaned work records (350 MPs, 478 IDAs)
+│   ├── Works_Sanctioned.csv          # Raw MPLADS sanction export file
 │   └── elliptic/                     # (Optional) Benchmark dataset for VGAE validation
 │       ├── raw/
 │       └── processed/
@@ -68,6 +68,8 @@ atml_project/
 └── frontend/
     └── ... (TanStack Start / React UI)
 ```
+
+*(Note: `data/works_sanctioned_clean.csv` is generated automatically during Step 1 of the pipeline below).*
 
 ---
 
