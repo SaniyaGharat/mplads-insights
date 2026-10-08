@@ -22,6 +22,10 @@ frontend/frontend/
 data/elliptic/raw/
 data/elliptic/processed/
 
+# Model artifacts and binary arrays
+*.npy
+*.pt
+
 # OS files
 .DS_Store
 Thumbs.db
