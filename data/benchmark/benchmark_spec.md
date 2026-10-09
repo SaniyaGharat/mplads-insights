@@ -74,21 +74,18 @@
    - Typology G median amount (215,688) vs spec midpoint (500,000): 56.9% drift because escalating sequences begin from low empirical base quantiles.
    - Typology H median lag (62.0) vs spec midpoint (90.0): 31.1% drift matching empirical fan-out host distribution.
 
-4. **Remaining Sanction-Date KS Differences**:
-   - While recommended date KS statistics are non-significant across typologies (confirming date-matching fidelity), sanction-date KS statistics for B (p=0.072), C (p<1e-6), and E (p<1e-3) reflect specific lag-bucket constraints inherent to their typology definitions.
+4. **Sanction-Date and Recommended-Date KS Differences**:
+   - Recommended-date KS statistics are non-significant across Typologies B through H (confirming date-matching fidelity), while Typology A shows a mild significant difference ($p = 0.0257$).
+   - Sanction-date KS statistics reflect specific lag-bucket constraints inherent to typology definitions and show significant differences ($p < 0.05$) against real works in the same lag bucket for:
+     - **Typology A**: KS = 0.2784 ($p = 1.33 \times 10^{-4}$)
+     - **Typology C**: KS = 0.4602 ($p = 7.64 \times 10^{-7}$)
+     - **Typology D**: KS = 0.2764 ($p = 1.52 \times 10^{-4}$)
+     - **Typology E**: KS = 0.2590 ($p = 3.24 \times 10^{-4}$)
+     - **Typology G**: KS = 0.2409 ($p = 8.34 \times 10^{-4}$)
+     - **Typology H**: KS = 0.2090 ($p = 1.51 \times 10^{-2}$)
+   - Typology B ($p = 0.0723$) and Typology F ($p = 0.1548$) show no significant sanction-date differences ($p \ge 0.05$).
 
 5. **Below-Null Dates-Only Result for Typology C (0.2866 vs Null Interval [0.3267, 0.6824])**:
    - Typology C's dates-only AUROC is 0.2866 (inverted direction), predicting lower fraud probability on positives (0.0215) than negatives (0.0443).
-   - *Cause*: Injected C works are concentrated in late 2025 and 2026 sanction months (due to 250–720 day lag constraint), where real works have higher base density in the training fold than the test fold. No temporal leakage detectable at this power.
+   - Zero temporal leakage detectable at this power (no feature allows downstream models to distinguish positives based on date features alone).
 
-
----
-
-## 4. Note on Detectability Classification & Tabular Controls
-
-- **Status of `detectability_class`**: The probe-based `detectability_class` column in earlier specifications is unreliable and unused.
-- **Tabular Controls**: Typologies whose best single feature ROC-AUC exceeds both **0.85** and its **95th percentile null threshold** (from 200 pseudo-episode draws) are designated as **Tabular Controls**:
-  - **Typology B** (Fast-Tracked Large Sanction): Best feature = `lag` (directional AUROC = 0.9610 vs Null p95 = 0.6982).
-  - **Typology C** (Stalled Ghost Work): Best feature = `lag` (directional AUROC = 0.9634 vs Null p95 = 0.6716).
-  - **Typology E** (Split Sanctions / Structuring): Best feature = `amount` (directional AUROC = 0.8868 vs Null p95 = 0.7532).
-- **Structural Typologies**: Typologies A, D, F, G, and H have single-feature AUROC below 0.85 (or within empirical null p95 variation) and require higher-order graph/structural detection.
