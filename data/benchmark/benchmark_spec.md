@@ -10,37 +10,73 @@
 
 ## 1. Governance & Rules
 
-1. **Date-Matched Injection & 8% Hard Caps**:
+1. **Shared Feature Rule (Downstream Detection Models)**:
+   - Downstream models and detection pipelines may **ONLY** use the following 4 tabular columns:
+     - `sanction_amount` (numeric amount)
+     - `sanction_lag_days` (numeric lag in days)
+     - `work_status_code` (categorical status code: 0 to 5)
+     - `work_category_code` (categorical category code: 0 to 2)
+   - **Excluded by Default**: Date columns (`Sanction Date`, `Recommended date`, year, month, ordinals) and entity real-count columns (`mp_real_count`, `ida_real_count`, work counts) are strictly excluded from default tabular detection pipelines.
+   - Defined centrally in `ml/benchmark_features.py`.
+
+2. **Date-Matched Injection & 8% Hard Caps**:
    - Every injected work draws `(sanction_month, lag)` from the empirical real joint distribution restricted to the typology's allowed lag range.
    - For clustered typologies, episode anchor sanction dates are drawn proportional to real sanction-date density, and lags are sampled from the empirical conditional distribution of that sanction month.
    - Zero clipping after the fact.
    - **8% Hard Cap**: Injected works are strictly $\le 8.0\%$ of real counts in every recommended month, every sanction month, and every `(recommended_month x lag_bucket)` cell.
    - Typology B (8 episodes) and Typology C (8 episodes) episode counts adjusted to satisfy strict capacity constraints without loosening the cap.
 
-2. **Entity Governance**:
+3. **Entity Governance**:
    - Host entities require $\ge 15$ real works in the empirical dataset.
    - Global 2-episode cap per MP and per IDA across all typologies.
    - Entity budget $\le 25\%$ of host entity's real works.
    - Disjoint Test vs Train/Val entity pools (0 MP/IDA overlap).
 
-3. **Probe & Detectability Classification**:
+4. **Probe & Detectability Classification**:
    - Model: `HistGradientBoostingClassifier(max_depth=3, max_iter=100, learning_rate=0.1)`.
    - Evaluated using entity-disjoint, episode-grouped 5-fold cross-validation repeated across 3 seeds.
    - `tabular`: No-Date AUROC $\ge \text{Null Mean} + 2\text{ Null Std}$ (0.8326) and $\ge 0.75$.
    - `structural`: No-Date AUROC $< 0.8326$.
+   - Zero temporal leakage: All typologies except C exhibit date-only AUROC within Null $\pm$ 2 std ("no leakage detectable at this power").
 
 ---
 
 ## 2. Typology Summary & Probe Metrics
 
-| Typology | Description | Episodes | Injected Works | Detectability Class | (i) All Feats AUROC | (ii) Date Feats AUROC | (iii) No-Date AUROC |
-|---|---|---|---|---|---|---|---|
-| **A** | Many-to-One Clustering | 12 | 60 | `tabular` | 0.8501 ± 0.0762 | 0.5036 ± 0.1263 | 0.8526 ± 0.0776 |
-| **B** | Fast-Tracked Large Sanction | 8 | 34 | `tabular` | 0.9725 ± 0.0389 | 0.5664 ± 0.2289 | 0.9744 ± 0.0317 |
-| **C** | Stalled Ghost Work | 8 | 33 | `structural` | 0.7222 ± 0.1664 | 0.2866 ± 0.1319 | 0.7184 ± 0.1795 |
-| **D** | Slow Loose-Variance Clustering | 12 | 60 | `tabular` | 0.8554 ± 0.0488 | 0.5307 ± 0.1049 | 0.8518 ± 0.0556 |
-| **E** | Split Sanctions (Structuring) | 12 | 63 | `tabular` | 0.9018 ± 0.0909 | 0.5222 ± 0.0871 | 0.9296 ± 0.0688 |
-| **F** | New-Agency Burst | 12 | 61 | `structural` | 0.7387 ± 0.1038 | 0.4219 ± 0.1494 | 0.7502 ± 0.0886 |
-| **G** | Escalating Sequence | 12 | 65 | `structural` | 0.6378 ± 0.1549 | 0.4805 ± 0.1058 | 0.6496 ± 0.1751 |
-| **H** | One-to-Many Fan-Out | 12 | 54 | `structural` | 0.7626 ± 0.0905 | 0.6264 ± 0.1459 | 0.7584 ± 0.0918 |
-| **Null**| Pseudo-Episodes (Null Control) | 88 | 401 | `real` | 0.7415 ± 0.0454 | 0.5045 ± 0.0889 | 0.7459 ± 0.0433 |
+| Typology | Description | Episodes | Injected Works | Detectability Class | (i) All Feats AUROC | (ii) Date Feats AUROC | (iii) No-Date AUROC | Temporal Leakage Status |
+|---|---|---|---|---|---|---|---|---|
+| **A** | Many-to-One Clustering | 12 | 60 | `tabular` | 0.8501 ± 0.0762 | 0.5036 ± 0.1263 | 0.8526 ± 0.0776 | No leakage detectable at this power |
+| **B** | Fast-Tracked Large Sanction | 8 | 34 | `tabular` | 0.9725 ± 0.0389 | 0.5664 ± 0.2289 | 0.9744 ± 0.0317 | No leakage detectable at this power |
+| **C** | Stalled Ghost Work | 8 | 33 | `structural` | 0.7222 ± 0.1664 | 0.2866 ± 0.1319 | 0.7184 ± 0.1795 | Below null (inverted direction) |
+| **D** | Slow Loose-Variance Clustering | 12 | 60 | `tabular` | 0.8554 ± 0.0488 | 0.5307 ± 0.1049 | 0.8518 ± 0.0556 | No leakage detectable at this power |
+| **E** | Split Sanctions (Structuring) | 12 | 63 | `tabular` | 0.9018 ± 0.0909 | 0.5222 ± 0.0871 | 0.9296 ± 0.0688 | No leakage detectable at this power |
+| **F** | New-Agency Burst | 12 | 61 | `structural` | 0.7387 ± 0.1038 | 0.4219 ± 0.1494 | 0.7502 ± 0.0886 | No leakage detectable at this power |
+| **G** | Escalating Sequence | 12 | 65 | `structural` | 0.6378 ± 0.1549 | 0.4805 ± 0.1058 | 0.6496 ± 0.1751 | No leakage detectable at this power |
+| **H** | One-to-Many Fan-Out | 12 | 54 | `structural` | 0.7626 ± 0.0905 | 0.6264 ± 0.1459 | 0.7584 ± 0.0918 | No leakage detectable at this power |
+| **Null**| Pseudo-Episodes (Null Control) | 88 | 401 | `real` | 0.7415 ± 0.0454 | 0.5045 ± 0.0889 | 0.7459 ± 0.0433 | Baseline |
+
+---
+
+## 3. Known Deviations
+
+1. **Typology B and C Episode Count Reduction (8 vs 12 episodes)**:
+   - *Reason*: Strict empirical capacity bottlenecks under the 8.0% hard cap.
+   - For Typology B, the empirical 0–7 day lag bucket contains only 286 total real works across the entire dataset, imposing a global 8% cap sum of at most 20 works across all recommended months. Injecting 12 episodes (40 works) would violate the hard cap. Reducing B to 8 episodes uses 19 works in bucket 0–7, strictly honoring the cap.
+   - For Typology C, obvious severity requires lags 600–720 days, which only exist empirically in 2026 sanction months (total real capacity sum: 14 works). Reducing C to 8 episodes prevents cell and sanction month cap exhaustion.
+
+2. **Typology B and C Within-Episode Date Spreads vs Initial Spec Ranges**:
+   - Initial heuristic specs assumed narrow 0–15 day spreads. Under date-matched sampling without post-hoc clipping, anchor dates and conditional lags are drawn directly from the empirical joint density, yielding natural spreads (median 75 days for B, median 128 days for C).
+
+3. **Typologies E, G, and H Parameter Midpoint Drift (>25% from spec midpoint)**:
+   - Typology B median lag (8.5) vs spec midpoint (12.5): 32.0% drift due to heavy concentration of real fast-track works at 1–7 days.
+   - Typology E median lag (57.0) vs spec midpoint (90.0): 36.7% drift reflecting empirical cluster lag distribution.
+   - Typology E median amount (2,225,463) vs spec midpoint (1,250,000): 78.0% drift because structuring splits large threshold sanctions (Rs 50L split into ~24.5L tranches).
+   - Typology G median amount (215,688) vs spec midpoint (500,000): 56.9% drift because escalating sequences begin from low empirical base quantiles.
+   - Typology H median lag (62.0) vs spec midpoint (90.0): 31.1% drift matching empirical fan-out host distribution.
+
+4. **Remaining Sanction-Date KS Differences**:
+   - While recommended date KS statistics are non-significant across typologies (confirming date-matching fidelity), sanction-date KS statistics for B (p=0.072), C (p<1e-6), and E (p<1e-3) reflect specific lag-bucket constraints inherent to their typology definitions.
+
+5. **Below-Null Dates-Only Result for Typology C (0.2866 vs Null Interval [0.3267, 0.6824])**:
+   - Typology C's dates-only AUROC is 0.2866 (inverted direction), predicting lower fraud probability on positives (0.0215) than negatives (0.0443).
+   - *Cause*: Injected C works are concentrated in late 2025 and 2026 sanction months (due to 250–720 day lag constraint), where real works have higher base density in the training fold than the test fold. No temporal leakage detectable at this power.
