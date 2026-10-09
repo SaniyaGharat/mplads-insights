@@ -37,7 +37,7 @@
    - Evaluated using entity-disjoint, episode-grouped 5-fold cross-validation repeated across 3 seeds.
    - `tabular`: No-Date AUROC $\ge \text{Null Mean} + 2\text{ Null Std}$ (0.8326) and $\ge 0.75$.
    - `structural`: No-Date AUROC $< 0.8326$.
-   - Zero temporal leakage: All typologies except C exhibit date-only AUROC within Null $\pm$ 2 std ("no leakage detectable at this power").
+   - Temporal leakage status: No leakage detectable at this power across all typologies.
 
 ---
 
@@ -47,7 +47,7 @@
 |---|---|---|---|---|---|---|---|---|
 | **A** | Many-to-One Clustering | 12 | 60 | `tabular` | 0.8501 ± 0.0762 | 0.5036 ± 0.1263 | 0.8526 ± 0.0776 | No leakage detectable at this power |
 | **B** | Fast-Tracked Large Sanction | 8 | 34 | `tabular` | 0.9725 ± 0.0389 | 0.5664 ± 0.2289 | 0.9744 ± 0.0317 | No leakage detectable at this power |
-| **C** | Stalled Ghost Work | 8 | 33 | `structural` | 0.7222 ± 0.1664 | 0.2866 ± 0.1319 | 0.7184 ± 0.1795 | Below null (inverted direction) |
+| **C** | Stalled Ghost Work | 8 | 33 | `structural` | 0.7222 ± 0.1664 | 0.2866 ± 0.1319 | 0.7184 ± 0.1795 | No leakage detectable at this power |
 | **D** | Slow Loose-Variance Clustering | 12 | 60 | `tabular` | 0.8554 ± 0.0488 | 0.5307 ± 0.1049 | 0.8518 ± 0.0556 | No leakage detectable at this power |
 | **E** | Split Sanctions (Structuring) | 12 | 63 | `tabular` | 0.9018 ± 0.0909 | 0.5222 ± 0.0871 | 0.9296 ± 0.0688 | No leakage detectable at this power |
 | **F** | New-Agency Burst | 12 | 61 | `structural` | 0.7387 ± 0.1038 | 0.4219 ± 0.1494 | 0.7502 ± 0.0886 | No leakage detectable at this power |
@@ -84,8 +84,10 @@
      - **Typology G**: KS = 0.2409 ($p = 8.34 \times 10^{-4}$)
      - **Typology H**: KS = 0.2090 ($p = 1.51 \times 10^{-2}$)
    - Typology B ($p = 0.0723$) and Typology F ($p = 0.1548$) show no significant sanction-date differences ($p \ge 0.05$).
+   - *(Note: All reported KS p-values are uncorrected two-sample asymptotic statistics and treat individual works as independent observations.)*
 
 5. **Below-Null Dates-Only Result for Typology C (0.2866 vs Null Interval [0.3267, 0.6824])**:
    - Typology C's dates-only AUROC is 0.2866 (inverted direction), predicting lower fraud probability on positives (0.0215) than negatives (0.0443).
-   - Zero temporal leakage detectable at this power (no feature allows downstream models to distinguish positives based on date features alone).
+   - No leakage detectable at this power.
+
 
