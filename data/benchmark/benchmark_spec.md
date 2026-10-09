@@ -80,3 +80,15 @@
 5. **Below-Null Dates-Only Result for Typology C (0.2866 vs Null Interval [0.3267, 0.6824])**:
    - Typology C's dates-only AUROC is 0.2866 (inverted direction), predicting lower fraud probability on positives (0.0215) than negatives (0.0443).
    - *Cause*: Injected C works are concentrated in late 2025 and 2026 sanction months (due to 250–720 day lag constraint), where real works have higher base density in the training fold than the test fold. No temporal leakage detectable at this power.
+
+
+---
+
+## 4. Note on Detectability Classification & Tabular Controls
+
+- **Status of `detectability_class`**: The probe-based `detectability_class` column in earlier specifications is unreliable and unused.
+- **Tabular Controls**: Typologies whose best single feature ROC-AUC exceeds both **0.85** and its **95th percentile null threshold** (from 200 pseudo-episode draws) are designated as **Tabular Controls**:
+  - **Typology B** (Fast-Tracked Large Sanction): Best feature = `lag` (directional AUROC = 0.9610 vs Null p95 = 0.6982).
+  - **Typology C** (Stalled Ghost Work): Best feature = `lag` (directional AUROC = 0.9634 vs Null p95 = 0.6716).
+  - **Typology E** (Split Sanctions / Structuring): Best feature = `amount` (directional AUROC = 0.8868 vs Null p95 = 0.7532).
+- **Structural Typologies**: Typologies A, D, F, G, and H have single-feature AUROC below 0.85 (or within empirical null p95 variation) and require higher-order graph/structural detection.
