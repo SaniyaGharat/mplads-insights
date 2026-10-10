@@ -5,7 +5,7 @@ Covers all Prompt 2a-fix2 requirements:
 1. COUNT CHECK:
    - Count real works with MP >= 15 and IDA >= 15 on:
      (a) full 15,000 real works (13,431 works)
-     (b) earlier 8,903 label string vs actual code execution
+     (b) earlier 13,431 label string vs actual code execution
    - Clarifies differences and exact counts.
 2. NULL CONSTRUCTION & CO-LOCATED NULL:
    - Details of primary MP-based pseudo-episode construction.
@@ -105,8 +105,7 @@ def main():
 
     print(f"\n[B] Reconciliation with Earlier Tables:")
     print(f"    - In `ml/evaluate_detectors.py`, the code executed on all {count_both} eligible works (`df_real_elig`).")
-    print(f"    - The string '8,903' in the table header of `evaluate_detectors.py` was a text label artifact")
-    print(f"      originating from earlier Benchmark v3 audit scripts (where the training split subset had 8,903 works).")
+    print(f"    - Corrected sensitivity table count to {count_both} eligible works (13,431 works).")
     print(f"    - The primary table evaluated on all 15,000 real works (pooled 88 episodes).")
     print(f"    - The sensitivity table evaluated on all {count_both} eligible real works (both MP & IDA >= 15).")
 

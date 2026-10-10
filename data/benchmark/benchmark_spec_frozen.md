@@ -39,7 +39,7 @@
      - `structural`: Typologies with single-feature ROC-AUC < 0.85 (within empirical null variation) requiring higher-order graph or structural detection: Typologies A, D, F, G, and H.
    - **Probe-Based Classification (Deprecated)**:
      - The earlier probe-based `detectability_class` column derived from `HistGradientBoostingClassifier(max_depth=3, max_iter=100, learning_rate=0.1)` evaluated via entity-disjoint 5-fold cross-validation is deprecated and replaced by single-feature controls.
-   - Temporal leakage status: No leakage detectable at this power across all typologies.
+   - Temporal leakage status: No leakage detectable at this power across all typologies (Typology C: Inverted date signal below null; absence of date dependence not claimed).
 
 ---
 
@@ -49,7 +49,7 @@
 |---|---|---|---|---|---|---|---|---|---|
 | **A** | Many-to-One Clustering | 12 | 60 | `structural` | `tabular` (deprecated) | 0.8501 ± 0.0762 | 0.5036 ± 0.1263 | 0.8526 ± 0.0776 | No leakage detectable at this power |
 | **B** | Fast-Tracked Large Sanction | 8 | 34 | `tabular` | `tabular` (deprecated) | 0.9725 ± 0.0389 | 0.5664 ± 0.2289 | 0.9744 ± 0.0317 | No leakage detectable at this power |
-| **C** | Stalled Ghost Work | 8 | 33 | `tabular` | `structural` (deprecated) | 0.7222 ± 0.1664 | 0.2866 ± 0.1319 | 0.7184 ± 0.1795 | No leakage detectable at this power |
+| **C** | Stalled Ghost Work | 8 | 33 | `tabular` | `structural` (deprecated) | 0.7222 ± 0.1664 | 0.2866 ± 0.1319 | 0.7184 ± 0.1795 | Inverted date signal below null; absence of date dependence not claimed |
 | **D** | Slow Loose-Variance Clustering | 12 | 60 | `structural` | `tabular` (deprecated) | 0.8554 ± 0.0488 | 0.5307 ± 0.1049 | 0.8518 ± 0.0556 | No leakage detectable at this power |
 | **E** | Split Sanctions (Structuring) | 12 | 63 | `tabular` | `tabular` (deprecated) | 0.9018 ± 0.0909 | 0.5222 ± 0.0871 | 0.9296 ± 0.0688 | No leakage detectable at this power |
 | **F** | New-Agency Burst | 12 | 61 | `structural` | `structural` (deprecated) | 0.7387 ± 0.1038 | 0.4219 ± 0.1494 | 0.7502 ± 0.0886 | No leakage detectable at this power |

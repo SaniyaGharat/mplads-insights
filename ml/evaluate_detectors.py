@@ -635,7 +635,7 @@ def evaluate_sensitivity_analysis(df_primary, df_syn, df_real_elig, eligible_mps
         "Robust Z-score": "robust_z_score",
     }
 
-    N_elig = len(df_real_elig) # 8,903
+    N_elig = len(df_real_elig) # 13,431
     elig_ranks_asc = {}
     for det_name, det_col in detectors.items():
         elig_ranks_asc[det_name] = stats.rankdata(df_real_elig[det_col].values) - 1.0
@@ -728,7 +728,7 @@ def evaluate_sensitivity_analysis(df_primary, df_syn, df_real_elig, eligible_mps
     df_sens_compact["Raw p"] = df_sens_compact["Raw p"].map(lambda v: f"{v:.4f}")
     df_sens_compact["Holm Adj p"] = df_sens_compact["Holm Adj p"].map(lambda v: f"{v:.4f}")
 
-    print("\n--- SENSITIVITY EVALUATION TABLE (8,903 ELIGIBLE NEGATIVES) ---")
+    print("\n--- SENSITIVITY EVALUATION TABLE (13,431 ELIGIBLE NEGATIVES) ---")
     print(df_sens_compact.to_string(index=False))
 
     print("\n--- CHANGES IN 'DETECTED' CALLS (Primary vs Sensitivity) ---")
