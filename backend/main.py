@@ -100,7 +100,26 @@ async def startup_event():
         s_centroid = np.mean(all_proj[s_indices], axis=0)
         siamese_scores = np.linalg.norm(all_proj - s_centroid, axis=1)
 
-    # 5. Store in memory
+    # 5. Load Real-Only Detector Scores & Fusion Scores for Deployment
+    real_det_path = 'data/deploy/real_detector_scores.csv'
+    if os.path.exists(real_det_path):
+        df_real_det = pd.read_csv(real_det_path)
+        community_scores = df_real_det['community_score'].values
+    else:
+        comm_fb = pd.read_csv('data/benchmark/fix3/community_scores_real_only.csv')
+        community_scores = comm_fb['community_score'].values
+
+    real_fus_path = 'data/deploy/real_fusion_scores.csv'
+    if os.path.exists(real_fus_path):
+        df_real_fus = pd.read_csv(real_fus_path)
+        fusion_scores = df_real_fus['fusion_score'].values
+    else:
+        fusion_scores = np.zeros(len(df_works))
+
+    DATA['community_scores'] = community_scores
+    DATA['fusion_scores'] = fusion_scores
+
+    # 6. Store in memory
     DATA['df_works'] = df_works
     DATA['labels_df'] = labels_df
     DATA['gat_scores'] = gat_scores
@@ -213,12 +232,61 @@ async def get_stats():
     }
 
 
+@app.get("/api/methods")
+async def get_methods():
+    return {
+        "methods": [
+            {
+                "id": "gat",
+                "name": "Graph Attention Network (GAT)",
+                "direction": "higher_is_riskier",
+                "note": "Reconstruction error from self-supervised GAT encoder"
+            },
+            {
+                "id": "siamese",
+                "name": "Siamese Network",
+                "direction": "lower_is_riskier",
+                "note": "Euclidean distance to suspicious centroid in metric space"
+            },
+            {
+                "id": "community",
+                "name": "Community Anomaly Scorer",
+                "direction": "higher_is_riskier",
+                "note": "Temporal co-occurrence and budget concentration anomaly score"
+            },
+            {
+                "id": "fusion",
+                "name": "Learned Fusion",
+                "direction": "higher_is_riskier",
+                "note": "Triage score from a model trained on synthetic fraud typologies; not validated on real fraud labels"
+            }
+        ]
+    }
+
+
 @app.get("/api/risk-scores")
 async def get_risk_scores(method: str = "gat", page: int = 1, page_size: int = 50):
-    scores = DATA['gat_scores'] if method == "gat" else DATA['siamese_scores']
+    method_lower = method.lower()
+    method_note = ""
 
-    # Rank indices
-    sorted_indices = np.argsort(scores if method == "siamese" else -scores)
+    if method_lower == "gat":
+        scores = DATA['gat_scores']
+        sorted_indices = np.argsort(-scores)
+    elif method_lower == "siamese":
+        scores = DATA['siamese_scores']
+        sorted_indices = np.argsort(scores)
+    elif method_lower == "community":
+        scores = DATA['community_scores']
+        sorted_indices = np.argsort(-scores)
+    elif method_lower == "fusion":
+        scores = DATA['fusion_scores']
+        sorted_indices = np.argsort(-scores)
+        method_note = "Triage score from a model trained on synthetic fraud typologies; not validated on real fraud labels"
+    else:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown method '{method}'. Available methods: gat, siamese, community, fusion"
+        )
 
     # Paginate
     start = (page - 1) * page_size
@@ -250,7 +318,14 @@ async def get_risk_scores(method: str = "gat", page: int = 1, page_size: int = 5
             "label_status": status
         })
 
-    return {"data": results, "page": page, "page_size": page_size, "total": len(scores)}
+    return {
+        "data": results,
+        "page": page,
+        "page_size": page_size,
+        "total": len(scores),
+        "method": method_lower,
+        "method_note": method_note
+    }
 
 @app.get("/api/graph")
 async def get_graph(top_n: int = 50):
