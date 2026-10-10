@@ -113,7 +113,7 @@ export const DEFAULT_METHODS: MethodInfo[] = [
     id: "siamese",
     name: "Siamese Network",
     direction: "lower_is_riskier",
-    note: "Distance to suspicious centroid; trained on 60 biased labels",
+    note: "Distance to suspicious centroid; trained on 51 usable analyst labels (biased sample)",
   },
   {
     id: "community",
@@ -262,12 +262,9 @@ function seeded(n: number) {
   return x - Math.floor(x);
 }
 
-const METHOD_NOTES: Record<ScoringMethod, string> = {
-  gat: "Reconstruction error; favours statistically rare works",
-  siamese: "Distance to suspicious centroid; trained on 60 biased labels",
-  community: "30-day, multi-MP co-occurrence at one agency, scored by amount similarity; capped at 1000; round-sum coincidences are common",
-  fusion: "Triage score from a model trained on synthetic fraud typologies; not validated on real fraud labels; rank-ordering score, not a probability; disagreed with analyst labels (see report)",
-};
+export const METHOD_NOTES: Record<ScoringMethod, string> = Object.fromEntries(
+  DEFAULT_METHODS.map((m) => [m.id, m.note]),
+) as Record<ScoringMethod, string>;
 
 function mockRiskScores(
   method: ScoringMethod,

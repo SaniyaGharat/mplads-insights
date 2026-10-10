@@ -22,6 +22,7 @@ function LabelBadge({ value }: { value: string }) {
 interface Props {
   rows: RiskRow[];
   offset: number;
+  total?: number;
   selected: number | null;
   isLoading: boolean;
   direction?: "higher_is_riskier" | "lower_is_riskier";
@@ -33,6 +34,7 @@ interface Props {
 export function RiskTable({
   rows,
   offset,
+  total = 15000,
   selected,
   isLoading,
   direction,
@@ -40,6 +42,7 @@ export function RiskTable({
   onSelect,
   onLabel,
 }: Props) {
+  const denom = total > 0 ? total : 15000;
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-[13px]">
@@ -83,6 +86,7 @@ export function RiskTable({
             const isSelected = selected === row.work_index;
             const feedback = rowFeedback?.[row.work_index];
             const rank = offset + i + 1;
+            const percentileStr = `Top ${((rank / denom) * 100).toFixed(2)}%`;
             return (
               <tr
                 key={row.work_index}
@@ -114,9 +118,9 @@ export function RiskTable({
                 </td>
                 <td
                   className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground"
-                  title={`Rank ${rank} of 15,000`}
+                  title={`Rank ${rank} of ${denom.toLocaleString("en-IN")}`}
                 >
-                  {((rank / 15000) * 100).toFixed(2)}%
+                  {percentileStr}
                 </td>
                 <td className="px-3 py-2">
                   <LabelBadge value={row.label_status} />

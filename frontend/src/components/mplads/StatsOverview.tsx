@@ -16,6 +16,7 @@ interface Props {
   isLoading: boolean;
   isMock: boolean;
   error?: string | undefined;
+  flaggedCount?: number;
 }
 
 const SAGE = "oklch(0.6 0.05 155)";
@@ -85,7 +86,7 @@ function Kpi({
   );
 }
 
-export function StatsOverview({ stats, isLoading, isMock, error }: Props) {
+export function StatsOverview({ stats, isLoading, isMock, error, flaggedCount }: Props) {
   if (isLoading || !stats) {
     return (
       <section className="border border-border bg-card px-5 py-12">
@@ -93,6 +94,10 @@ export function StatsOverview({ stats, isLoading, isMock, error }: Props) {
       </section>
     );
   }
+
+  const computedFlaggedCount =
+    flaggedCount ??
+    (stats.label_counts ? stats.label_counts.training_label + stats.label_counts.gat_top : 62);
 
   const topMps = [...stats.top_risky_mps]
     .sort((a, b) => b.flagged_count - a.flagged_count)
@@ -105,6 +110,10 @@ export function StatsOverview({ stats, isLoading, isMock, error }: Props) {
 
   return (
     <section className="grid gap-5">
+      <div className="border border-border/80 bg-secondary/50 px-4 py-2.5 text-xs text-muted-foreground">
+        Overview, histogram and graph use GAT scores and the {computedFlaggedCount}-work flagged set; they do not change with the selected method.
+      </div>
+
       {isMock && (
         <p className="border border-alert/30 bg-alert/8 px-5 py-2 text-xs text-alert">
           Summary endpoint unreachable ({error ?? "network error"}). Showing sample aggregates.
@@ -113,7 +122,7 @@ export function StatsOverview({ stats, isLoading, isMock, error }: Props) {
 
       <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-6">
         <Kpi label="Total works reviewed" value={stats.total_works.toLocaleString("en-IN")} />
-        <Kpi label="Total amount flagged" value={formatINR(stats.total_amount)} />
+        <Kpi label="Total amount sanctioned" value={formatINR(stats.total_amount)} />
         <Kpi
           label="Avg. sanction lag"
           value={`${Math.round(stats.avg_lag_days).toLocaleString("en-IN")} d`}

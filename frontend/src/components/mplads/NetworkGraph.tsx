@@ -5,6 +5,7 @@ interface Props {
   graph: GraphResponse | null;
   isLoading: boolean;
   isMock: boolean;
+  flaggedCount?: number;
   selectedWorkIndex: number | null;
   onSelectEdge: (workIndex: number) => void;
 }
@@ -16,6 +17,7 @@ export function NetworkGraph({
   graph,
   isLoading,
   isMock,
+  flaggedCount = 62,
   selectedWorkIndex,
   onSelectEdge,
 }: Props) {
@@ -58,6 +60,9 @@ export function NetworkGraph({
           <p className="mt-1 text-xs text-muted-foreground">
             {layout.mps.length} MPs · {layout.idas.length} agencies · {graph.edges.length}{" "}
             sanctioned works
+          </p>
+          <p className="mt-0.5 text-[11px] text-muted-foreground/80">
+            Overview, histogram and graph use GAT scores and the {flaggedCount}-work flagged set; they do not change with the selected method.
           </p>
         </div>
         <div className="flex items-center gap-4 text-xs text-muted-foreground">

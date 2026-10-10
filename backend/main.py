@@ -246,7 +246,7 @@ async def get_methods():
                 "id": "siamese",
                 "name": "Siamese Network",
                 "direction": "lower_is_riskier",
-                "note": "Distance to suspicious centroid; trained on 60 biased labels"
+                "note": "Distance to suspicious centroid; trained on 51 usable analyst labels (biased sample)"
             },
             {
                 "id": "community",
@@ -276,7 +276,7 @@ async def get_risk_scores(method: str = "gat", page: int = 1, page_size: int = 5
     elif method_lower == "siamese":
         scores = DATA['siamese_scores']
         sorted_indices = np.argsort(scores)
-        method_note = "Distance to suspicious centroid; trained on 60 biased labels"
+        method_note = "Distance to suspicious centroid; trained on 51 usable analyst labels (biased sample)"
     elif method_lower == "community":
         scores = DATA['community_scores']
         sorted_indices = np.argsort(-scores)

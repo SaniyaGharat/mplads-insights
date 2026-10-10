@@ -134,13 +134,26 @@ function Dashboard() {
   const rows = scores.data?.data.data ?? [];
   const total = scores.data?.data.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const isMock = scores.data?.source === "mock";
+  const isAnyMock =
+    scores.data?.source === "mock" ||
+    methodsQuery.data?.source === "mock" ||
+    graph.data?.source === "mock" ||
+    stats.data?.source === "mock";
+  const flaggedCount = stats.data?.data
+    ? stats.data.data.label_counts.training_label + stats.data.data.label_counts.gat_top
+    : 62;
 
   const onLabel = (workIndex: number, value: LabelValue) => label.mutate({ workIndex, value });
 
   return (
     <div className="min-h-screen bg-background flex flex-col justify-between">
       <div>
+        {isAnyMock && (
+          <div className="border-b border-alert bg-alert/15 px-6 py-2.5 text-center text-xs font-semibold text-alert">
+            Demo data: backend unreachable. Nothing on this page is real output.
+          </div>
+        )}
+
         <header className="border-b border-border bg-card">
           <div className="mx-auto flex max-w-[1600px] flex-wrap items-end justify-between gap-6 px-6 py-5">
             <div>
@@ -169,16 +182,6 @@ function Dashboard() {
           </div>
         </header>
 
-        {isMock && (
-          <div className="border-b border-alert/30 bg-alert/8">
-            <p className="mx-auto max-w-[1600px] px-6 py-2 text-xs text-alert">
-              Live API unreachable ({scores.data?.error ?? "network error"}). Showing sample records
-              so the interface can be reviewed. Update the base URL in{" "}
-              <span className="font-mono">src/lib/config.ts</span> once the backend is deployed.
-            </p>
-          </div>
-        )}
-
         <main className="mx-auto grid max-w-[1600px] gap-5 px-6 py-6 xl:grid-cols-[minmax(0,1fr)_420px]">
           <div className="xl:col-span-2">
             <StatsOverview
@@ -186,6 +189,7 @@ function Dashboard() {
               isLoading={stats.isLoading}
               isMock={stats.data?.source === "mock"}
               error={stats.data?.error}
+              flaggedCount={flaggedCount}
             />
           </div>
 
@@ -296,6 +300,7 @@ function Dashboard() {
               <RiskTable
                 rows={rows}
                 offset={(page - 1) * PAGE_SIZE}
+                total={total}
                 selected={selected?.work_index ?? null}
                 isLoading={scores.isFetching}
                 direction={currentMethod?.direction}
@@ -358,6 +363,7 @@ function Dashboard() {
               graph={graph.data?.data ?? null}
               isLoading={graph.isLoading}
               isMock={graph.data?.source === "mock"}
+              flaggedCount={flaggedCount}
               selectedWorkIndex={selected?.work_index ?? null}
               onSelectEdge={(workIndex) => {
                 const row = rows.find((r) => r.work_index === workIndex);
