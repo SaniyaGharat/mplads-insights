@@ -46,5 +46,5 @@
    - Typology F (New-Agency Burst) is solo-MP by design; it only triggers `community_score > 0` (4.92% of works) when other real MPs happen to have co-occurring works at the same IDA within the 30-day window.
 
 6. **Sensitivity Analysis**:
-   - Evaluation repeated with negatives restricted to 8,903 eligible real works (both MP and IDA $\ge 15$ real works).
+   - Evaluation repeated with negatives restricted to 13,431 eligible real works (both MP and IDA $\ge 15$ real works).
    - Zero changes in 'detected' calls across all detectors and typologies, confirming robustness to entity capacity filters.
