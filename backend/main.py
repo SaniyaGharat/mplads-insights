@@ -240,25 +240,25 @@ async def get_methods():
                 "id": "gat",
                 "name": "Graph Attention Network (GAT)",
                 "direction": "higher_is_riskier",
-                "note": "Reconstruction error from self-supervised GAT encoder"
+                "note": "Reconstruction error; favours statistically rare works"
             },
             {
                 "id": "siamese",
                 "name": "Siamese Network",
                 "direction": "lower_is_riskier",
-                "note": "Euclidean distance to suspicious centroid in metric space"
+                "note": "Distance to suspicious centroid; trained on 60 biased labels"
             },
             {
                 "id": "community",
                 "name": "Community Anomaly Scorer",
                 "direction": "higher_is_riskier",
-                "note": "Temporal co-occurrence and budget concentration anomaly score"
+                "note": "30-day, multi-MP co-occurrence at one agency, scored by amount similarity; capped at 1000; round-sum coincidences are common"
             },
             {
                 "id": "fusion",
                 "name": "Learned Fusion",
                 "direction": "higher_is_riskier",
-                "note": "Triage score from a model trained on synthetic fraud typologies; not validated on real fraud labels"
+                "note": "Triage score from a model trained on synthetic fraud typologies; not validated on real fraud labels; rank-ordering score, not a probability; disagreed with analyst labels (see report)"
             }
         ]
     }
@@ -272,16 +272,19 @@ async def get_risk_scores(method: str = "gat", page: int = 1, page_size: int = 5
     if method_lower == "gat":
         scores = DATA['gat_scores']
         sorted_indices = np.argsort(-scores)
+        method_note = "Reconstruction error; favours statistically rare works"
     elif method_lower == "siamese":
         scores = DATA['siamese_scores']
         sorted_indices = np.argsort(scores)
+        method_note = "Distance to suspicious centroid; trained on 60 biased labels"
     elif method_lower == "community":
         scores = DATA['community_scores']
         sorted_indices = np.argsort(-scores)
+        method_note = "30-day, multi-MP co-occurrence at one agency, scored by amount similarity; capped at 1000; round-sum coincidences are common"
     elif method_lower == "fusion":
         scores = DATA['fusion_scores']
         sorted_indices = np.argsort(-scores)
-        method_note = "Triage score from a model trained on synthetic fraud typologies; not validated on real fraud labels"
+        method_note = "Triage score from a model trained on synthetic fraud typologies; not validated on real fraud labels; rank-ordering score, not a probability; disagreed with analyst labels (see report)"
     else:
         raise HTTPException(
             status_code=400,
