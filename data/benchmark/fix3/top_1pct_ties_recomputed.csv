@@ -1,0 +1,46 @@
+Detector,Detector_Column,Typology,Total_Injected_Works,Score_At_Rank_154,Tied_Works_At_Rank_154,Hits_Injected_First,Hits_Real_First,Hits_Random_Mean_100
+GAT (Frozen),gat_frozen,A,60,174.22505,2,0,0,0.0
+GAT (Frozen),gat_frozen,B,34,174.22505,2,0,0,0.0
+GAT (Frozen),gat_frozen,C,33,174.22505,2,0,0,0.0
+GAT (Frozen),gat_frozen,D,60,174.22505,2,0,0,0.0
+GAT (Frozen),gat_frozen,E,63,174.22505,2,0,0,0.0
+GAT (Frozen),gat_frozen,F,61,174.22505,2,0,0,0.0
+GAT (Frozen),gat_frozen,G,65,174.22505,2,0,0,0.0
+GAT (Frozen),gat_frozen,H,54,174.22505,2,0,0,0.0
+GAT (Frozen),gat_frozen,ALL (Total),430,174.22505,2,0,0,0.0
+GAT (Augmented),gat_augmented,A,60,174.38217,1,0,0,0.0
+GAT (Augmented),gat_augmented,B,34,174.38217,1,0,0,0.0
+GAT (Augmented),gat_augmented,C,33,174.38217,1,0,0,0.0
+GAT (Augmented),gat_augmented,D,60,174.38217,1,0,0,0.0
+GAT (Augmented),gat_augmented,E,63,174.38217,1,0,0,0.0
+GAT (Augmented),gat_augmented,F,61,174.38217,1,0,0,0.0
+GAT (Augmented),gat_augmented,G,65,174.38217,1,0,0,0.0
+GAT (Augmented),gat_augmented,H,54,174.38217,1,0,0,0.0
+GAT (Augmented),gat_augmented,ALL (Total),430,174.38217,1,0,0,0.0
+Community Scorer,community_score,A,60,24.30084970999071,6,21,21,21.0
+Community Scorer,community_score,B,34,24.30084970999071,6,0,0,0.0
+Community Scorer,community_score,C,33,24.30084970999071,6,0,0,0.0
+Community Scorer,community_score,D,60,24.30084970999071,6,9,9,9.0
+Community Scorer,community_score,E,63,24.30084970999071,6,0,0,0.0
+Community Scorer,community_score,F,61,24.30084970999071,6,0,0,0.0
+Community Scorer,community_score,G,65,24.30084970999071,6,0,0,0.0
+Community Scorer,community_score,H,54,24.30084970999071,6,1,1,1.0
+Community Scorer,community_score,ALL (Total),430,24.30084970999071,6,31,31,31.0
+Isolation Forest,iforest_score,A,60,0.1841597875051082,1,0,0,0.0
+Isolation Forest,iforest_score,B,34,0.1841597875051082,1,0,0,0.0
+Isolation Forest,iforest_score,C,33,0.1841597875051082,1,0,0,0.0
+Isolation Forest,iforest_score,D,60,0.1841597875051082,1,0,0,0.0
+Isolation Forest,iforest_score,E,63,0.1841597875051082,1,0,0,0.0
+Isolation Forest,iforest_score,F,61,0.1841597875051082,1,0,0,0.0
+Isolation Forest,iforest_score,G,65,0.1841597875051082,1,0,0,0.0
+Isolation Forest,iforest_score,H,54,0.1841597875051082,1,0,0,0.0
+Isolation Forest,iforest_score,ALL (Total),430,0.1841597875051082,1,0,0,0.0
+Robust Z-score,robust_z_score,A,60,6.149768608012836,1,0,0,0.0
+Robust Z-score,robust_z_score,B,34,6.149768608012836,1,0,0,0.0
+Robust Z-score,robust_z_score,C,33,6.149768608012836,1,8,8,8.0
+Robust Z-score,robust_z_score,D,60,6.149768608012836,1,0,0,0.0
+Robust Z-score,robust_z_score,E,63,6.149768608012836,1,0,0,0.0
+Robust Z-score,robust_z_score,F,61,6.149768608012836,1,0,0,0.0
+Robust Z-score,robust_z_score,G,65,6.149768608012836,1,0,0,0.0
+Robust Z-score,robust_z_score,H,54,6.149768608012836,1,0,0,0.0
+Robust Z-score,robust_z_score,ALL (Total),430,6.149768608012836,1,8,8,8.0

@@ -1,0 +1,10 @@
+Typology,Episodes,Positives (Injected Works),Primary Negatives (All Real Works),Sensitivity Negatives (Eligible Real Works),Sensitivity Ratio (Pos/Neg)
+A,12,60,15000,13431,0.004467
+B,8,34,15000,13431,0.002531
+C,8,33,15000,13431,0.002457
+D,12,60,15000,13431,0.004467
+E,12,63,15000,13431,0.004691
+F,12,61,15000,13431,0.004542
+G,12,65,15000,13431,0.004840
+H,12,54,15000,13431,0.004021
+ALL (Pooled),88,430,15000,13431,0.032015

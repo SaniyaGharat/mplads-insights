@@ -33,28 +33,29 @@
    - Entity budget $\le 25\%$ of host entity's real works.
    - Disjoint Test vs Train/Val entity pools (0 MP/IDA overlap).
 
-4. **Probe & Detectability Classification**:
-   - Model: `HistGradientBoostingClassifier(max_depth=3, max_iter=100, learning_rate=0.1)`.
-   - Evaluated using entity-disjoint, episode-grouped 5-fold cross-validation repeated across 3 seeds.
-   - `tabular`: No-Date AUROC $\ge \text{Null Mean} + 2\text{ Null Std}$ (0.8326) and $\ge 0.75$.
-   - `structural`: No-Date AUROC $< 0.8326$.
+4. **Detectability Classification & Single-Feature Controls**:
+   - **Single-Feature Control Classification** (Current Standard):
+     - `tabular`: Typologies whose best single feature ROC-AUC exceeds both 0.85 and its 95th percentile null threshold (from 200 pseudo-episode draws): Typologies B (lag AUROC = 0.9610 vs p95 = 0.6982), C (lag AUROC = 0.9634 vs p95 = 0.6716), and E (amount AUROC = 0.8868 vs p95 = 0.7532).
+     - `structural`: Typologies with single-feature ROC-AUC < 0.85 (within empirical null variation) requiring higher-order graph or structural detection: Typologies A, D, F, G, and H.
+   - **Probe-Based Classification (Deprecated)**:
+     - The earlier probe-based `detectability_class` column derived from `HistGradientBoostingClassifier(max_depth=3, max_iter=100, learning_rate=0.1)` evaluated via entity-disjoint 5-fold cross-validation is deprecated and replaced by single-feature controls.
    - Temporal leakage status: No leakage detectable at this power across all typologies.
 
 ---
 
 ## 2. Typology Summary & Probe Metrics
 
-| Typology | Description | Episodes | Injected Works | Detectability Class | (i) All Feats AUROC | (ii) Date Feats AUROC | (iii) No-Date AUROC | Temporal Leakage Status |
-|---|---|---|---|---|---|---|---|---|
-| **A** | Many-to-One Clustering | 12 | 60 | `tabular` | 0.8501 ± 0.0762 | 0.5036 ± 0.1263 | 0.8526 ± 0.0776 | No leakage detectable at this power |
-| **B** | Fast-Tracked Large Sanction | 8 | 34 | `tabular` | 0.9725 ± 0.0389 | 0.5664 ± 0.2289 | 0.9744 ± 0.0317 | No leakage detectable at this power |
-| **C** | Stalled Ghost Work | 8 | 33 | `structural` | 0.7222 ± 0.1664 | 0.2866 ± 0.1319 | 0.7184 ± 0.1795 | No leakage detectable at this power |
-| **D** | Slow Loose-Variance Clustering | 12 | 60 | `tabular` | 0.8554 ± 0.0488 | 0.5307 ± 0.1049 | 0.8518 ± 0.0556 | No leakage detectable at this power |
-| **E** | Split Sanctions (Structuring) | 12 | 63 | `tabular` | 0.9018 ± 0.0909 | 0.5222 ± 0.0871 | 0.9296 ± 0.0688 | No leakage detectable at this power |
-| **F** | New-Agency Burst | 12 | 61 | `structural` | 0.7387 ± 0.1038 | 0.4219 ± 0.1494 | 0.7502 ± 0.0886 | No leakage detectable at this power |
-| **G** | Escalating Sequence | 12 | 65 | `structural` | 0.6378 ± 0.1549 | 0.4805 ± 0.1058 | 0.6496 ± 0.1751 | No leakage detectable at this power |
-| **H** | One-to-Many Fan-Out | 12 | 54 | `structural` | 0.7626 ± 0.0905 | 0.6264 ± 0.1459 | 0.7584 ± 0.0918 | No leakage detectable at this power |
-| **Null**| Pseudo-Episodes (Null Control) | 88 | 401 | `real` | 0.7415 ± 0.0454 | 0.5045 ± 0.0889 | 0.7459 ± 0.0433 | Baseline |
+| Typology | Description | Episodes | Injected Works | Detectability Class (Control) | Probe Class (Deprecated) | (i) All Feats AUROC | (ii) Date Feats AUROC | (iii) No-Date AUROC | Temporal Leakage Status |
+|---|---|---|---|---|---|---|---|---|---|
+| **A** | Many-to-One Clustering | 12 | 60 | `structural` | `tabular` (deprecated) | 0.8501 ± 0.0762 | 0.5036 ± 0.1263 | 0.8526 ± 0.0776 | No leakage detectable at this power |
+| **B** | Fast-Tracked Large Sanction | 8 | 34 | `tabular` | `tabular` (deprecated) | 0.9725 ± 0.0389 | 0.5664 ± 0.2289 | 0.9744 ± 0.0317 | No leakage detectable at this power |
+| **C** | Stalled Ghost Work | 8 | 33 | `tabular` | `structural` (deprecated) | 0.7222 ± 0.1664 | 0.2866 ± 0.1319 | 0.7184 ± 0.1795 | No leakage detectable at this power |
+| **D** | Slow Loose-Variance Clustering | 12 | 60 | `structural` | `tabular` (deprecated) | 0.8554 ± 0.0488 | 0.5307 ± 0.1049 | 0.8518 ± 0.0556 | No leakage detectable at this power |
+| **E** | Split Sanctions (Structuring) | 12 | 63 | `tabular` | `tabular` (deprecated) | 0.9018 ± 0.0909 | 0.5222 ± 0.0871 | 0.9296 ± 0.0688 | No leakage detectable at this power |
+| **F** | New-Agency Burst | 12 | 61 | `structural` | `structural` (deprecated) | 0.7387 ± 0.1038 | 0.4219 ± 0.1494 | 0.7502 ± 0.0886 | No leakage detectable at this power |
+| **G** | Escalating Sequence | 12 | 65 | `structural` | `structural` (deprecated) | 0.6378 ± 0.1549 | 0.4805 ± 0.1058 | 0.6496 ± 0.1751 | No leakage detectable at this power |
+| **H** | One-to-Many Fan-Out | 12 | 54 | `structural` | `structural` (deprecated) | 0.7626 ± 0.0905 | 0.6264 ± 0.1459 | 0.7584 ± 0.0918 | No leakage detectable at this power |
+| **Null**| Pseudo-Episodes (Null Control) | 88 | 401 | `real` | `real` | 0.7415 ± 0.0454 | 0.5045 ± 0.0889 | 0.7459 ± 0.0433 | Baseline |
 
 ---
 
@@ -88,5 +89,4 @@
    - *(Note: All reported KS p-values are uncorrected two-sample asymptotic statistics and treat individual works as independent observations.)*
 
 5. **Below-Null Dates-Only Result for Typology C (0.2866 vs Null Interval [0.3267, 0.6824])**:
-   - Typology C's dates-only AUROC is 0.2866 (inverted direction), predicting lower fraud probability on positives (0.0215) than negatives (0.0443).
-   - No leakage detectable at this power.
+   - Typology C's dates-only AUROC 0.2866 lies below the stated null interval [0.3267, 0.6824]; the direction is inverted (predicting lower fraud probability on positives 0.0215 than negatives 0.0443), and we do not claim absence of date dependence.
