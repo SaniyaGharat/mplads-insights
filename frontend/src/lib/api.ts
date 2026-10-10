@@ -1,7 +1,18 @@
 import { API_BASE_URL } from "./config";
 
-export type ScoringMethod = "gat" | "siamese";
+export type ScoringMethod = "gat" | "siamese" | "community" | "fusion";
 export type LabelStatus = "Training Label" | "GAT-Top" | "New" | string;
+
+export interface MethodInfo {
+  id: ScoringMethod;
+  name: string;
+  direction: "higher_is_riskier" | "lower_is_riskier";
+  note: string;
+}
+
+export interface MethodsResponse {
+  methods: MethodInfo[];
+}
 
 export interface RiskRow {
   work_index: number;
@@ -20,6 +31,8 @@ export interface RiskScoresResponse {
   page: number;
   page_size: number;
   total: number;
+  method?: string;
+  method_note?: string;
 }
 
 export interface GraphNode {
@@ -88,6 +101,46 @@ async function getJson<T>(path: string): Promise<T> {
 }
 
 // ---------------- real endpoints (exact shapes) ----------------
+
+export const DEFAULT_METHODS: MethodInfo[] = [
+  {
+    id: "gat",
+    name: "Graph Attention Network (GAT)",
+    direction: "higher_is_riskier",
+    note: "Reconstruction error; favours statistically rare works",
+  },
+  {
+    id: "siamese",
+    name: "Siamese Network",
+    direction: "lower_is_riskier",
+    note: "Distance to suspicious centroid; trained on 60 biased labels",
+  },
+  {
+    id: "community",
+    name: "Community Anomaly Scorer",
+    direction: "higher_is_riskier",
+    note: "30-day, multi-MP co-occurrence at one agency, scored by amount similarity; capped at 1000; round-sum coincidences are common",
+  },
+  {
+    id: "fusion",
+    name: "Learned Fusion",
+    direction: "higher_is_riskier",
+    note: "Triage score from a model trained on synthetic fraud typologies; not validated on real fraud labels; rank-ordering score, not a probability; disagreed with analyst labels (see report)",
+  },
+];
+
+export async function fetchMethods(): Promise<Sourced<MethodsResponse>> {
+  try {
+    const data = await getJson<MethodsResponse>(`/methods`);
+    return { data, source: "live" };
+  } catch (e) {
+    return {
+      data: { methods: DEFAULT_METHODS },
+      source: "mock",
+      error: (e as Error).message,
+    };
+  }
+}
 
 export async function fetchRiskScores(
   method: ScoringMethod,
@@ -209,16 +262,29 @@ function seeded(n: number) {
   return x - Math.floor(x);
 }
 
+const METHOD_NOTES: Record<ScoringMethod, string> = {
+  gat: "Reconstruction error; favours statistically rare works",
+  siamese: "Distance to suspicious centroid; trained on 60 biased labels",
+  community: "30-day, multi-MP co-occurrence at one agency, scored by amount similarity; capped at 1000; round-sum coincidences are common",
+  fusion: "Triage score from a model trained on synthetic fraud typologies; not validated on real fraud labels; rank-ordering score, not a probability; disagreed with analyst labels (see report)",
+};
+
 function mockRiskScores(
   method: ScoringMethod,
   page: number,
   pageSize: number,
 ): RiskScoresResponse {
   const offset = (page - 1) * pageSize;
-  const bias = method === "gat" ? 0 : 7;
+  const bias = method === "gat" ? 0 : method === "siamese" ? 7 : method === "community" ? 14 : 21;
   const data: RiskRow[] = Array.from({ length: pageSize }, (_, i) => {
     const rank = offset + i + 1;
     const r = seeded(rank + bias);
+    // For Siamese, lower_is_riskier, so lowest distance is at rank 1.
+    // For others, higher_is_riskier.
+    const score =
+      method === "siamese"
+        ? Math.min(10.0, 0.05 + rank * 0.0005 + r * 0.02)
+        : Math.max(0.01, 0.995 - rank * 0.00006 - r * 0.02);
     return {
       work_index: 100000 + rank * 7 + bias,
       MP: at(MPS, rank + bias),
@@ -227,11 +293,18 @@ function mockRiskScores(
       sanction_lag_days: Math.round(4 + seeded(rank * 2 + bias) * 730),
       status: at(STATUSES, rank + bias),
       category: at(CATEGORIES, rank * 2 + bias),
-      score: Math.max(0.01, 0.995 - rank * 0.00006 - r * 0.02),
+      score,
       label_status: at(LABELS, rank + bias),
     };
   });
-  return { data, page, page_size: pageSize, total: MOCK_TOTAL };
+  return {
+    data,
+    page,
+    page_size: pageSize,
+    total: MOCK_TOTAL,
+    method,
+    method_note: METHOD_NOTES[method] ?? "",
+  };
 }
 
 function mockGraph(topN: number): GraphResponse {

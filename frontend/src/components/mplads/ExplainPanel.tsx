@@ -1,8 +1,9 @@
-import { formatINR, type ExplainResponse, type LabelValue, type RiskRow } from "@/lib/api";
+import { formatINR, type ExplainResponse, type LabelValue, type RiskRow, type ScoringMethod } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface Props {
   row: RiskRow | null;
+  method?: ScoringMethod;
   explain: ExplainResponse | null;
   isLoading: boolean;
   isMock: boolean;
@@ -10,7 +11,7 @@ interface Props {
   onLabel: (workIndex: number, label: LabelValue) => void;
 }
 
-export function ExplainPanel({ row, explain, isLoading, isMock, feedback, onLabel }: Props) {
+export function ExplainPanel({ row, method = "gat", explain, isLoading, isMock, feedback, onLabel }: Props) {
   if (!row) {
     return (
       <div className="border border-border bg-card p-5 text-sm text-muted-foreground">
@@ -33,7 +34,7 @@ export function ExplainPanel({ row, explain, isLoading, isMock, feedback, onLabe
           ["Amount", formatINR(row.amount)],
           ["Sanction lag", `${row.sanction_lag_days} days`],
           ["Status", row.status],
-          ["Anomaly score", row.score.toFixed(3)],
+          ["Triage score", row.score.toFixed(3)],
         ].map(([k, v]) => (
           <div key={k}>
             <dt className="text-[11px] tracking-wider text-muted-foreground uppercase">{k}</dt>
@@ -42,38 +43,46 @@ export function ExplainPanel({ row, explain, isLoading, isMock, feedback, onLabe
         ))}
       </dl>
 
-      <div className="px-5 py-4">
-        <h3 className="text-[11px] tracking-wider text-muted-foreground uppercase">
-          Top 3 influencing neighbours
-        </h3>
-        {isLoading && <p className="mt-3 text-sm text-muted-foreground">Loading attribution…</p>}
-        {!isLoading && explain && (
-          <ol className="mt-3 space-y-3">
-            {explain.top_neighbors.slice(0, 3).map((n, i) => (
-              <li key={`${n.neighbor}-${i}`}>
-                <div className="flex items-baseline justify-between gap-4 text-[13px]">
-                  <span>
-                    <span className="mr-2 font-mono text-muted-foreground">{i + 1}.</span>
-                    {n.neighbor}
-                  </span>
-                  <span className="font-mono tabular-nums">{n.weight.toFixed(2)}</span>
-                </div>
-                <div className="mt-1 h-2 w-full bg-secondary">
-                  <div
-                    className="h-2 bg-sage"
-                    style={{ width: `${Math.min(100, Math.max(2, n.weight * 100))}%` }}
-                  />
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-        {isMock && !isLoading && (
-          <p className="mt-3 text-xs text-muted-foreground">
-            Backend unreachable — showing fallback attribution.
+      {method === "gat" ? (
+        <div className="px-5 py-4">
+          <h3 className="text-[11px] tracking-wider text-muted-foreground uppercase">
+            Top 3 influencing neighbours
+          </h3>
+          {isLoading && <p className="mt-3 text-sm text-muted-foreground">Loading attribution…</p>}
+          {!isLoading && explain && (
+            <ol className="mt-3 space-y-3">
+              {explain.top_neighbors.slice(0, 3).map((n, i) => (
+                <li key={`${n.neighbor}-${i}`}>
+                  <div className="flex items-baseline justify-between gap-4 text-[13px]">
+                    <span>
+                      <span className="mr-2 font-mono text-muted-foreground">{i + 1}.</span>
+                      {n.neighbor}
+                    </span>
+                    <span className="font-mono tabular-nums">{n.weight.toFixed(2)}</span>
+                  </div>
+                  <div className="mt-1 h-2 w-full bg-secondary">
+                    <div
+                      className="h-2 bg-sage"
+                      style={{ width: `${Math.min(100, Math.max(2, n.weight * 100))}%` }}
+                    />
+                  </div>
+                </li>
+              ))}
+            </ol>
+          )}
+          {isMock && !isLoading && (
+            <p className="mt-3 text-xs text-muted-foreground">
+              Backend unreachable — showing fallback attribution.
+            </p>
+          )}
+        </div>
+      ) : (
+        <div className="px-5 py-6">
+          <p className="text-sm text-muted-foreground">
+            No per-work explanation available for this method
           </p>
-        )}
-      </div>
+        </div>
+      )}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-secondary/50 px-5 py-3">
         <div className="flex flex-wrap items-center gap-2">

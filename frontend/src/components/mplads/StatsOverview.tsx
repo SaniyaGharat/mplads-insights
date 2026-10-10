@@ -149,7 +149,7 @@ export function StatsOverview({ stats, isLoading, isMock, error }: Props) {
         </ChartCard>
 
         <ChartCard
-          title="Anomaly score distribution"
+          title="Triage score distribution"
           subtitle="Equal-count buckets — note how wide the final bucket is compared to the rest"
         >
           <ResponsiveContainer width="100%" height={260}>

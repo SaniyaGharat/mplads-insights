@@ -24,12 +24,22 @@ interface Props {
   offset: number;
   selected: number | null;
   isLoading: boolean;
+  direction?: "higher_is_riskier" | "lower_is_riskier";
   rowFeedback?: Record<number, { status: "success" | "duplicate" | "error"; message: string }>;
   onSelect: (row: RiskRow) => void;
   onLabel: (workIndex: number, label: LabelValue) => void;
 }
 
-export function RiskTable({ rows, offset, selected, isLoading, rowFeedback, onSelect, onLabel }: Props) {
+export function RiskTable({
+  rows,
+  offset,
+  selected,
+  isLoading,
+  direction,
+  rowFeedback,
+  onSelect,
+  onLabel,
+}: Props) {
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-[13px]">
@@ -42,15 +52,28 @@ export function RiskTable({ rows, offset, selected, isLoading, rowFeedback, onSe
               "Amount (₹)",
               "Lag (days)",
               "Status",
-              "Score",
+              "Triage Score",
+              "Percentile",
               "Label Status",
               "Mark",
             ].map((h) => (
               <th
                 key={h}
-                className="px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase"
+                className={cn(
+                  "px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase",
+                  (h === "Amount (₹)" ||
+                    h === "Lag (days)" ||
+                    h === "Triage Score" ||
+                    h === "Percentile") &&
+                    "text-right",
+                )}
               >
                 {h}
+                {h === "Triage Score" && direction === "lower_is_riskier" && (
+                  <span className="block text-[9px] font-normal lowercase tracking-normal text-muted-foreground">
+                    (lower is riskier)
+                  </span>
+                )}
               </th>
             ))}
           </tr>
@@ -59,6 +82,7 @@ export function RiskTable({ rows, offset, selected, isLoading, rowFeedback, onSe
           {rows.map((row, i) => {
             const isSelected = selected === row.work_index;
             const feedback = rowFeedback?.[row.work_index];
+            const rank = offset + i + 1;
             return (
               <tr
                 key={row.work_index}
@@ -69,7 +93,7 @@ export function RiskTable({ rows, offset, selected, isLoading, rowFeedback, onSe
                 )}
               >
                 <td className="px-3 py-2 font-mono text-muted-foreground tabular-nums">
-                  {offset + i + 1}
+                  {rank}
                 </td>
                 <td className="px-3 py-2 font-medium whitespace-nowrap">{row.MP}</td>
                 <td className="max-w-[190px] truncate px-3 py-2 text-muted-foreground">{row.IDA}</td>
@@ -87,6 +111,12 @@ export function RiskTable({ rows, offset, selected, isLoading, rowFeedback, onSe
                 <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{row.status}</td>
                 <td className="px-3 py-2 text-right font-mono tabular-nums">
                   {row.score.toFixed(3)}
+                </td>
+                <td
+                  className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground"
+                  title={`Rank ${rank} of 15,000`}
+                >
+                  {((rank / 15000) * 100).toFixed(2)}%
                 </td>
                 <td className="px-3 py-2">
                   <LabelBadge value={row.label_status} />
@@ -134,7 +164,7 @@ export function RiskTable({ rows, offset, selected, isLoading, rowFeedback, onSe
           })}
           {rows.length === 0 && !isLoading && (
             <tr>
-              <td colSpan={9} className="px-3 py-10 text-center text-muted-foreground">
+              <td colSpan={10} className="px-3 py-10 text-center text-muted-foreground">
                 No records returned.
               </td>
             </tr>
