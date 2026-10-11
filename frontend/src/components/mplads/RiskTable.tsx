@@ -25,6 +25,7 @@ interface Props {
   total?: number;
   selected: number | null;
   isLoading: boolean;
+  isDemo?: boolean;
   direction?: "higher_is_riskier" | "lower_is_riskier";
   rowFeedback?: Record<number, { status: "success" | "duplicate" | "error"; message: string }>;
   onSelect: (row: RiskRow) => void;
@@ -37,6 +38,7 @@ export function RiskTable({
   total = 15000,
   selected,
   isLoading,
+  isDemo = false,
   direction,
   rowFeedback,
   onSelect,
@@ -128,38 +130,54 @@ export function RiskTable({
                 <td className="px-3 py-2 whitespace-nowrap">
                   <div className="flex items-center gap-1.5">
                     <button
+                      disabled={isDemo}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (isDemo) return;
                         onLabel(row.work_index, "s");
                       }}
                       title="Mark suspicious"
-                      className="w-6 border border-alert/40 py-0.5 text-[11px] font-medium text-alert hover:bg-alert/10 cursor-pointer"
+                      className={cn(
+                        "w-6 border border-alert/40 py-0.5 text-[11px] font-medium text-alert hover:bg-alert/10 cursor-pointer",
+                        isDemo && "opacity-50 cursor-not-allowed hover:bg-transparent",
+                      )}
                     >
                       S
                     </button>
                     <button
+                      disabled={isDemo}
                       onClick={(e) => {
                         e.stopPropagation();
+                        if (isDemo) return;
                         onLabel(row.work_index, "n");
                       }}
                       title="Mark normal"
-                      className="w-6 border border-ok/40 py-0.5 text-[11px] font-medium text-ok hover:bg-ok/10 cursor-pointer"
+                      className={cn(
+                        "w-6 border border-ok/40 py-0.5 text-[11px] font-medium text-ok hover:bg-ok/10 cursor-pointer",
+                        isDemo && "opacity-50 cursor-not-allowed hover:bg-transparent",
+                      )}
                     >
                       N
                     </button>
-                    {feedback && (
-                      <span
-                        className={cn(
-                          "ml-1 text-[11px] font-medium",
-                          feedback.status === "duplicate"
-                            ? "text-amber-500 font-semibold"
-                            : feedback.status === "success"
-                            ? "text-ok"
-                            : "text-destructive"
-                        )}
-                      >
-                        {feedback.message}
+                    {isDemo ? (
+                      <span className="ml-1 text-[11px] text-muted-foreground italic">
+                        Labelling disabled in demo mode.
                       </span>
+                    ) : (
+                      feedback && (
+                        <span
+                          className={cn(
+                            "ml-1 text-[11px] font-medium",
+                            feedback.status === "duplicate"
+                              ? "text-amber-500 font-semibold"
+                              : feedback.status === "success"
+                              ? "text-ok"
+                              : "text-destructive"
+                          )}
+                        >
+                          {feedback.message}
+                        </span>
+                      )
                     )}
                   </div>
                 </td>

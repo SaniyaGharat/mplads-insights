@@ -206,16 +206,10 @@ export async function postLabel(
     if (e?.status === 409 || e?.message?.includes("already been labeled") || e?.message?.includes("Already labeled")) {
       throw e;
     }
-    // Only fall back to mock when offline/network failure
     if (e?.status && e.status !== 0) {
       throw e;
     }
-    mockTotals[label] += 1;
-    return {
-      data: { status: "success", totals: { ...mockTotals } },
-      source: "mock",
-      error: (e as Error).message,
-    };
+    throw new Error("Backend unreachable; label not saved");
   }
 }
 

@@ -51,11 +51,16 @@ function Dashboard() {
     Record<number, { status: "success" | "duplicate" | "error"; message: string }>
   >({});
 
+  const labelTotals = useQuery({
+    queryKey: ["label-totals"],
+    queryFn: fetchLabelTotals,
+  });
+
   useEffect(() => {
-    fetchLabelTotals().then((res) => {
-      if (res.data) setTotals(res.data);
-    });
-  }, []);
+    if (labelTotals.data?.data) {
+      setTotals(labelTotals.data.data);
+    }
+  }, [labelTotals.data]);
 
   const methodsQuery = useQuery({
     queryKey: ["methods"],
@@ -84,13 +89,26 @@ function Dashboard() {
     enabled: selected !== null && method === "gat",
   });
 
+  const isAnyMock =
+    scores.data?.source === "mock" ||
+    methodsQuery.data?.source === "mock" ||
+    graph.data?.source === "mock" ||
+    stats.data?.source === "mock" ||
+    explain.data?.source === "mock" ||
+    labelTotals.data?.source === "mock";
+
   const label = useMutation({
-    mutationFn: ({ workIndex, value }: { workIndex: number; value: LabelValue }) =>
-      postLabel(workIndex, value),
+    mutationFn: ({ workIndex, value }: { workIndex: number; value: LabelValue }) => {
+      if (isAnyMock) {
+        return Promise.reject(new Error("Labelling disabled in demo mode."));
+      }
+      return postLabel(workIndex, value);
+    },
     onSuccess: (res, variables) => {
       if (res.data?.totals) {
         setTotals(res.data.totals);
       }
+      labelTotals.refetch();
       setRowFeedback((prev) => ({
         ...prev,
         [variables.workIndex]: {
@@ -134,16 +152,14 @@ function Dashboard() {
   const rows = scores.data?.data.data ?? [];
   const total = scores.data?.data.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const isAnyMock =
-    scores.data?.source === "mock" ||
-    methodsQuery.data?.source === "mock" ||
-    graph.data?.source === "mock" ||
-    stats.data?.source === "mock";
   const flaggedCount = stats.data?.data
     ? stats.data.data.label_counts.training_label + stats.data.data.label_counts.gat_top
     : 62;
 
-  const onLabel = (workIndex: number, value: LabelValue) => label.mutate({ workIndex, value });
+  const onLabel = (workIndex: number, value: LabelValue) => {
+    if (isAnyMock) return;
+    label.mutate({ workIndex, value });
+  };
 
   return (
     <div className="min-h-screen bg-background flex flex-col justify-between">
@@ -303,6 +319,7 @@ function Dashboard() {
                 total={total}
                 selected={selected?.work_index ?? null}
                 isLoading={scores.isFetching}
+                isDemo={isAnyMock}
                 direction={currentMethod?.direction}
                 rowFeedback={rowFeedback}
                 onSelect={setSelected}
@@ -353,6 +370,7 @@ function Dashboard() {
               explain={explain.data?.data ?? null}
               isLoading={explain.isFetching}
               isMock={explain.data?.source === "mock"}
+              isDemo={isAnyMock}
               feedback={selected ? rowFeedback[selected.work_index] : null}
               onLabel={onLabel}
             />
