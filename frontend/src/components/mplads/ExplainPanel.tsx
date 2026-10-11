@@ -8,11 +8,22 @@ interface Props {
   isLoading: boolean;
   isMock: boolean;
   isDemo?: boolean;
+  labellingEnabled?: boolean;
   feedback?: { status: "success" | "duplicate" | "error"; message: string } | null | undefined;
   onLabel: (workIndex: number, label: LabelValue) => void;
 }
 
-export function ExplainPanel({ row, method = "gat", explain, isLoading, isMock, isDemo = false, feedback, onLabel }: Props) {
+export function ExplainPanel({
+  row,
+  method = "gat",
+  explain,
+  isLoading,
+  isMock,
+  isDemo = false,
+  labellingEnabled = false,
+  feedback,
+  onLabel,
+}: Props) {
   if (!row) {
     return (
       <div className="border border-border bg-card p-5 text-sm text-muted-foreground">
@@ -86,52 +97,58 @@ export function ExplainPanel({ row, method = "gat", explain, isLoading, isMock, 
       )}
 
       <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border bg-secondary/50 px-5 py-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <button
-            disabled={isDemo}
-            onClick={() => {
-              if (isDemo) return;
-              onLabel(row.work_index, "s");
-            }}
-            className={cn(
-              "border border-alert/50 bg-alert/10 px-3 py-1.5 text-xs font-medium text-alert hover:bg-alert/20 cursor-pointer",
-              isDemo && "opacity-50 cursor-not-allowed hover:bg-alert/10",
+        {labellingEnabled ? (
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              disabled={isDemo}
+              onClick={() => {
+                if (isDemo) return;
+                onLabel(row.work_index, "s");
+              }}
+              className={cn(
+                "border border-alert/50 bg-alert/10 px-3 py-1.5 text-xs font-medium text-alert hover:bg-alert/20 cursor-pointer",
+                isDemo && "opacity-50 cursor-not-allowed hover:bg-alert/10",
+              )}
+            >
+              Mark Suspicious
+            </button>
+            <button
+              disabled={isDemo}
+              onClick={() => {
+                if (isDemo) return;
+                onLabel(row.work_index, "n");
+              }}
+              className={cn(
+                "border border-ok/50 bg-ok/10 px-3 py-1.5 text-xs font-medium text-ok hover:bg-ok/20 cursor-pointer",
+                isDemo && "opacity-50 cursor-not-allowed hover:bg-ok/10",
+              )}
+            >
+              Mark Normal
+            </button>
+            <button
+              disabled={isDemo}
+              onClick={() => {
+                if (isDemo) return;
+                onLabel(row.work_index, "skip");
+              }}
+              className={cn(
+                "border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted cursor-pointer",
+                isDemo && "opacity-50 cursor-not-allowed hover:bg-transparent",
+              )}
+            >
+              Skip
+            </button>
+            {isDemo && (
+              <span className="text-xs text-muted-foreground italic">
+                Labelling disabled in demo mode.
+              </span>
             )}
-          >
-            Mark Suspicious
-          </button>
-          <button
-            disabled={isDemo}
-            onClick={() => {
-              if (isDemo) return;
-              onLabel(row.work_index, "n");
-            }}
-            className={cn(
-              "border border-ok/50 bg-ok/10 px-3 py-1.5 text-xs font-medium text-ok hover:bg-ok/20 cursor-pointer",
-              isDemo && "opacity-50 cursor-not-allowed hover:bg-ok/10",
-            )}
-          >
-            Mark Normal
-          </button>
-          <button
-            disabled={isDemo}
-            onClick={() => {
-              if (isDemo) return;
-              onLabel(row.work_index, "skip");
-            }}
-            className={cn(
-              "border border-border px-3 py-1.5 text-xs font-medium text-muted-foreground hover:bg-muted cursor-pointer",
-              isDemo && "opacity-50 cursor-not-allowed hover:bg-transparent",
-            )}
-          >
-            Skip
-          </button>
-          {isDemo && (
-            <span className="text-xs text-muted-foreground italic">
-              Labelling disabled in demo mode.
-            </span>
-          )}
-        </div>
+          </div>
+        ) : (
+          <p className="text-xs text-muted-foreground italic">
+            Labels shown are the 60 analyst labels collected offline; labelling is disabled in this deployment.
+          </p>
+        )}
         {feedback && (
           <span
             className={cn(

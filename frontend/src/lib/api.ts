@@ -80,6 +80,25 @@ export async function fetchLabelTotals(): Promise<Sourced<LabelTotals>> {
   }
 }
 
+export interface HealthResponse {
+  status: string;
+  message: string;
+  labelling_enabled: boolean;
+}
+
+export async function fetchHealth(): Promise<Sourced<HealthResponse>> {
+  try {
+    const data = await getJson<HealthResponse>(`/health`);
+    return { data, source: "live" };
+  } catch (e) {
+    return {
+      data: { status: "offline", message: "backend unreachable", labelling_enabled: false },
+      source: "mock",
+      error: (e as Error).message,
+    };
+  }
+}
+
 export interface LabelResponse {
   status: string;
   totals: LabelTotals;

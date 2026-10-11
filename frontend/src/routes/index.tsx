@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import {
   fetchExplain,
   fetchGraph,
+  fetchHealth,
   fetchMethods,
   fetchRiskScores,
   fetchStats,
@@ -89,18 +90,25 @@ function Dashboard() {
     enabled: selected !== null && method === "gat",
   });
 
+  const health = useQuery({ queryKey: ["health"], queryFn: fetchHealth });
+  const labellingEnabled = health.data?.data.labelling_enabled ?? false;
+
   const isAnyMock =
     scores.data?.source === "mock" ||
     methodsQuery.data?.source === "mock" ||
     graph.data?.source === "mock" ||
     stats.data?.source === "mock" ||
     explain.data?.source === "mock" ||
-    labelTotals.data?.source === "mock";
+    labelTotals.data?.source === "mock" ||
+    health.data?.source === "mock";
 
   const label = useMutation({
     mutationFn: ({ workIndex, value }: { workIndex: number; value: LabelValue }) => {
       if (isAnyMock) {
         return Promise.reject(new Error("Labelling disabled in demo mode."));
+      }
+      if (!labellingEnabled) {
+        return Promise.reject(new Error("Labelling is disabled in this deployment."));
       }
       return postLabel(workIndex, value);
     },
@@ -157,7 +165,7 @@ function Dashboard() {
     : 62;
 
   const onLabel = (workIndex: number, value: LabelValue) => {
-    if (isAnyMock) return;
+    if (isAnyMock || !labellingEnabled) return;
     label.mutate({ workIndex, value });
   };
 
@@ -217,6 +225,11 @@ function Dashboard() {
                   {total.toLocaleString("en-IN")} records · page {page} of{" "}
                   {pageCount.toLocaleString("en-IN")}
                 </p>
+                {!labellingEnabled && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Labels shown are the 60 analyst labels collected offline; labelling is disabled in this deployment.
+                  </p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <span className="text-[11px] tracking-wider text-muted-foreground uppercase">
@@ -320,6 +333,7 @@ function Dashboard() {
                 selected={selected?.work_index ?? null}
                 isLoading={scores.isFetching}
                 isDemo={isAnyMock}
+                labellingEnabled={labellingEnabled}
                 direction={currentMethod?.direction}
                 rowFeedback={rowFeedback}
                 onSelect={setSelected}
@@ -371,6 +385,7 @@ function Dashboard() {
               isLoading={explain.isFetching}
               isMock={explain.data?.source === "mock"}
               isDemo={isAnyMock}
+              labellingEnabled={labellingEnabled}
               feedback={selected ? rowFeedback[selected.work_index] : null}
               onLabel={onLabel}
             />

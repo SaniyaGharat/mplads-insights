@@ -52,10 +52,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+def is_labelling_enabled() -> bool:
+    return os.getenv("LABELLING_ENABLED", "false").strip().lower() in ("true", "1", "yes")
+
 @app.get("/health")
 @app.get("/api/health")
 async def health_check():
-    return {"status": "ok", "message": "MPLADS backend is running"}
+    return {
+        "status": "ok",
+        "message": "MPLADS backend is running",
+        "labelling_enabled": is_labelling_enabled(),
+    }
 
 # Global state
 DATA = {}
@@ -435,6 +442,12 @@ async def get_label_totals():
 
 @app.post("/api/label")
 async def add_label(req: LabelRequest):
+    if not is_labelling_enabled():
+        raise HTTPException(
+            status_code=403,
+            detail="Labelling is disabled in this deployment"
+        )
+
     # Input Validation
     if not (0 <= req.work_index < 15000):
         raise HTTPException(status_code=400, detail="work_index must be in range [0, 14999]")

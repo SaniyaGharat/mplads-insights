@@ -26,6 +26,7 @@ interface Props {
   selected: number | null;
   isLoading: boolean;
   isDemo?: boolean;
+  labellingEnabled?: boolean;
   direction?: "higher_is_riskier" | "lower_is_riskier" | undefined;
   rowFeedback?: Record<number, { status: "success" | "duplicate" | "error"; message: string }>;
   onSelect: (row: RiskRow) => void;
@@ -39,29 +40,31 @@ export function RiskTable({
   selected,
   isLoading,
   isDemo = false,
+  labellingEnabled = false,
   direction,
   rowFeedback,
   onSelect,
   onLabel,
 }: Props) {
   const denom = total > 0 ? total : 15000;
+  const headers = [
+    "Rank",
+    "MP",
+    "Implementing Agency",
+    "Amount (₹)",
+    "Lag (days)",
+    "Status",
+    "Triage Score",
+    "Percentile",
+    "Label Status",
+    ...(labellingEnabled ? ["Mark"] : []),
+  ];
   return (
     <div className="overflow-x-auto">
       <table className="w-full border-collapse text-[13px]">
         <thead>
           <tr className="border-b border-border bg-secondary/70 text-left">
-            {[
-              "Rank",
-              "MP",
-              "Implementing Agency",
-              "Amount (₹)",
-              "Lag (days)",
-              "Status",
-              "Triage Score",
-              "Percentile",
-              "Label Status",
-              "Mark",
-            ].map((h) => (
+            {headers.map((h) => (
               <th
                 key={h}
                 className={cn(
@@ -127,66 +130,68 @@ export function RiskTable({
                 <td className="px-3 py-2">
                   <LabelBadge value={row.label_status} />
                 </td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  <div className="flex items-center gap-1.5">
-                    <button
-                      disabled={isDemo}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (isDemo) return;
-                        onLabel(row.work_index, "s");
-                      }}
-                      title="Mark suspicious"
-                      className={cn(
-                        "w-6 border border-alert/40 py-0.5 text-[11px] font-medium text-alert hover:bg-alert/10 cursor-pointer",
-                        isDemo && "opacity-50 cursor-not-allowed hover:bg-transparent",
-                      )}
-                    >
-                      S
-                    </button>
-                    <button
-                      disabled={isDemo}
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        if (isDemo) return;
-                        onLabel(row.work_index, "n");
-                      }}
-                      title="Mark normal"
-                      className={cn(
-                        "w-6 border border-ok/40 py-0.5 text-[11px] font-medium text-ok hover:bg-ok/10 cursor-pointer",
-                        isDemo && "opacity-50 cursor-not-allowed hover:bg-transparent",
-                      )}
-                    >
-                      N
-                    </button>
-                    {isDemo ? (
-                      <span className="ml-1 text-[11px] text-muted-foreground italic">
-                        Labelling disabled in demo mode.
-                      </span>
-                    ) : (
-                      feedback && (
-                        <span
-                          className={cn(
-                            "ml-1 text-[11px] font-medium",
-                            feedback.status === "duplicate"
-                              ? "text-amber-500 font-semibold"
-                              : feedback.status === "success"
-                              ? "text-ok"
-                              : "text-destructive"
-                          )}
-                        >
-                          {feedback.message}
+                {labellingEnabled && (
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    <div className="flex items-center gap-1.5">
+                      <button
+                        disabled={isDemo}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isDemo) return;
+                          onLabel(row.work_index, "s");
+                        }}
+                        title="Mark suspicious"
+                        className={cn(
+                          "w-6 border border-alert/40 py-0.5 text-[11px] font-medium text-alert hover:bg-alert/10 cursor-pointer",
+                          isDemo && "opacity-50 cursor-not-allowed hover:bg-transparent",
+                        )}
+                      >
+                        S
+                      </button>
+                      <button
+                        disabled={isDemo}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (isDemo) return;
+                          onLabel(row.work_index, "n");
+                        }}
+                        title="Mark normal"
+                        className={cn(
+                          "w-6 border border-ok/40 py-0.5 text-[11px] font-medium text-ok hover:bg-ok/10 cursor-pointer",
+                          isDemo && "opacity-50 cursor-not-allowed hover:bg-transparent",
+                        )}
+                      >
+                        N
+                      </button>
+                      {isDemo ? (
+                        <span className="ml-1 text-[11px] text-muted-foreground italic">
+                          Labelling disabled in demo mode.
                         </span>
-                      )
-                    )}
-                  </div>
-                </td>
+                      ) : (
+                        feedback && (
+                          <span
+                            className={cn(
+                              "ml-1 text-[11px] font-medium",
+                              feedback.status === "duplicate"
+                                ? "text-amber-500 font-semibold"
+                                : feedback.status === "success"
+                                ? "text-ok"
+                                : "text-destructive"
+                            )}
+                          >
+                            {feedback.message}
+                          </span>
+                        )
+                      )}
+                    </div>
+                  </td>
+                )}
               </tr>
             );
           })}
           {rows.length === 0 && !isLoading && (
             <tr>
-              <td colSpan={10} className="px-3 py-10 text-center text-muted-foreground">
+              <td colSpan={labellingEnabled ? 10 : 9} className="px-3 py-10 text-center text-muted-foreground">
                 No records returned.
               </td>
             </tr>
