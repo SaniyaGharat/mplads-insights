@@ -297,7 +297,7 @@ export function EvaluationTab() {
           <div>
             <h3 className="text-base font-semibold">Multi-Model Fusion Benchmarks</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Statistical evaluation of supervised ensemble fusion vs. Bag-of-Tokens (BoT) and hindsight best single detector baselines.
+              Statistical evaluation of supervised ensemble fusion vs. train-selected best detector (community scorer) and hindsight best single detector baselines.
             </p>
           </div>
           <div className="flex border border-border">
@@ -337,9 +337,9 @@ export function EvaluationTab() {
                   <tr className="border-b border-border bg-secondary/50 text-[11px] text-muted-foreground">
                     <th className="px-3 py-2 font-medium">Model</th>
                     <th className="px-3 py-2 font-medium text-right">Mean AUPRC</th>
-                    <th className="px-3 py-2 font-medium text-right">Δ vs BoT (Mean)</th>
-                    <th className="px-3 py-2 font-medium text-center">95% CI vs BoT</th>
-                    <th className="px-3 py-2 font-medium text-center">Beats BoT</th>
+                    <th className="px-3 py-2 font-medium text-right">Δ vs train-selected best detector (Mean)</th>
+                    <th className="px-3 py-2 font-medium text-center">95% CI vs train-selected best detector</th>
+                    <th className="px-3 py-2 font-medium text-center">Beats train-selected best detector</th>
                     <th className="px-3 py-2 font-medium text-right">Δ vs hindsight best single detector (Mean)</th>
                     <th className="px-3 py-2 font-medium text-center">95% CI vs hindsight best single detector</th>
                     <th className="px-3 py-2 font-medium text-center">Beats hindsight best single detector</th>
@@ -407,9 +407,9 @@ export function EvaluationTab() {
                   <tr className="border-b border-border bg-secondary/50 text-[11px] text-muted-foreground">
                     <th className="px-3 py-2 font-medium">Model</th>
                     <th className="px-3 py-2 font-medium text-right">Mean AUPRC (FGH)</th>
-                    <th className="px-3 py-2 font-medium text-right">Δ vs BoT (Mean)</th>
-                    <th className="px-3 py-2 font-medium text-center">95% CI vs BoT</th>
-                    <th className="px-3 py-2 font-medium text-center">Beats BoT</th>
+                    <th className="px-3 py-2 font-medium text-right">Δ vs train-selected best detector (Mean)</th>
+                    <th className="px-3 py-2 font-medium text-center">95% CI vs train-selected best detector</th>
+                    <th className="px-3 py-2 font-medium text-center">Beats train-selected best detector</th>
                     <th className="px-3 py-2 font-medium text-right">Δ vs hindsight best single detector (Mean)</th>
                     <th className="px-3 py-2 font-medium text-center">95% CI vs hindsight best single detector</th>
                     <th className="px-3 py-2 font-medium text-center">Beats hindsight best single detector</th>

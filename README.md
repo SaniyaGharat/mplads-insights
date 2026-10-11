@@ -121,7 +121,7 @@ python -m uvicorn backend.main:app --port 8000 --reload
   - `GET /api/explain/{work_index}` — Top 3 neighbor GAT attention attribution.
   - `GET /api/graph?top_n=50` — Subgraph topology visualization.
   - `GET /api/label-totals` — Live analyst label counts (`{"s": 28, "n": 23, "skip": 9}`).
-  - `POST /api/label` — Submit analyst review (`s`, `n`, `skip`) with 409 duplicate protection.
+  - `POST /api/label` — Submit analyst review (`s`, `n`, `skip`) with 409 duplicate protection. Labelling is off by default; set LABELLING_ENABLED=true to enable POST /api/label.
 
 ---
 
