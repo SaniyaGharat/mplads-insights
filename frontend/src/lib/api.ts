@@ -25,6 +25,7 @@ export interface RiskRow {
   category: string;
   score: number;
   label_status: LabelStatus;
+  review_flag?: boolean;
 }
 
 export interface RiskScoresFilterParams {
@@ -37,6 +38,7 @@ export interface RiskScoresFilterParams {
   min_lag?: number | string;
   max_lag?: number | string;
   label_status?: string;
+  flag_pct?: number;
 }
 
 export interface FilterOptionsResponse {
@@ -48,6 +50,67 @@ export interface FilterOptionsResponse {
   amount_max: number;
   lag_min: number;
   lag_max: number;
+}
+
+export interface MethodComparisonItem {
+  id: ScoringMethod;
+  name: string;
+  score: number;
+  global_rank: number;
+  percentile: number;
+  direction: "higher_is_riskier" | "lower_is_riskier";
+}
+
+export interface WorkCompareResponse {
+  work_index: number;
+  total_works: number;
+  methods: Record<ScoringMethod, MethodComparisonItem>;
+}
+
+export interface ReviewBudgetRecallRow {
+  Detector: string;
+  Detector_Column: string;
+  Typology: string;
+  Total_Injected: number;
+  "Hits_Top 1%": number;
+  "Recall_Top 1%": number;
+  "Recall_Str_Top 1%": string;
+  "Hits_Top 2%": number;
+  "Recall_Top 2%": number;
+  "Recall_Str_Top 2%": string;
+  "Hits_Top 5%": number;
+  "Recall_Top 5%": number;
+  "Recall_Str_Top 5%": string;
+  "Hits_Top 10%": number;
+  "Recall_Top 10%": number;
+  "Recall_Str_Top 10%": string;
+}
+
+export interface FusionSummaryRow {
+  model: string;
+  mean_auprc_p1?: number;
+  mean_auprc_fgh?: number;
+  diff_vs_bot_mean: number;
+  diff_vs_bot_ci_95: string;
+  pos_families_vs_bot?: string;
+  pos_typ_fgh_vs_bot?: string;
+  pos_typ_all_vs_bot?: string;
+  beats_bot_pooled?: string;
+  beats_bot_fgh?: string;
+  diff_vs_hin_mean: number;
+  diff_vs_hin_ci_95: string;
+  pos_families_vs_hin?: string;
+  pos_typ_fgh_vs_hin?: string;
+  pos_typ_all_vs_hin?: string;
+  beats_hin_pooled?: string;
+  beats_hin_fgh?: string;
+}
+
+export interface EvaluationResponse {
+  review_budget_recall: ReviewBudgetRecallRow[];
+  p1_pooled_summary: FusionSummaryRow[];
+  p2_bootstrap_primary_fgh: FusionSummaryRow[];
+  limitations: string[];
 }
 
 export interface RiskScoresResponse {
@@ -214,12 +277,41 @@ export async function fetchRiskScores(
       params.set("max_lag", String(filters.max_lag));
     }
     if (filters?.label_status?.trim()) params.set("label_status", filters.label_status.trim());
+    if (filters?.flag_pct !== undefined && filters.flag_pct !== null) {
+      params.set("flag_pct", String(filters.flag_pct));
+    }
 
     const data = await getJson<RiskScoresResponse>(`/risk-scores?${params.toString()}`);
     return { data, source: "live" };
   } catch (e) {
     return {
-      data: mockRiskScores(method, page, pageSize),
+      data: mockRiskScores(method, page, pageSize, filters),
+      source: "mock",
+      error: (e as Error).message,
+    };
+  }
+}
+
+export async function fetchWorkCompare(workIndex: number): Promise<Sourced<WorkCompareResponse>> {
+  try {
+    const data = await getJson<WorkCompareResponse>(`/work/${workIndex}/compare`);
+    return { data, source: "live" };
+  } catch (e) {
+    return {
+      data: mockWorkCompare(workIndex),
+      source: "mock",
+      error: (e as Error).message,
+    };
+  }
+}
+
+export async function fetchEvaluation(): Promise<Sourced<EvaluationResponse>> {
+  try {
+    const data = await getJson<EvaluationResponse>(`/evaluation`);
+    return { data, source: "live" };
+  } catch (e) {
+    return {
+      data: mockEvaluation(),
       source: "mock",
       error: (e as Error).message,
     };
@@ -351,9 +443,11 @@ function mockRiskScores(
   method: ScoringMethod,
   page: number,
   pageSize: number,
+  filters?: RiskScoresFilterParams,
 ): RiskScoresResponse {
   const offset = (page - 1) * pageSize;
   const bias = method === "gat" ? 0 : method === "siamese" ? 7 : method === "community" ? 14 : 21;
+  const flagThreshold = Math.round(15000 * ((filters?.flag_pct ?? 5) / 100));
   const data: RiskRow[] = Array.from({ length: pageSize }, (_, i) => {
     const rank = offset + i + 1;
     const r = seeded(rank + bias);
@@ -374,6 +468,7 @@ function mockRiskScores(
       category: at(CATEGORIES, rank * 2 + bias),
       score,
       label_status: at(LABELS, rank + bias),
+      review_flag: rank <= flagThreshold,
     };
   });
   return {
@@ -383,6 +478,141 @@ function mockRiskScores(
     total: MOCK_TOTAL,
     method,
     method_note: METHOD_NOTES[method] ?? "",
+  };
+}
+
+function mockWorkCompare(workIndex: number): WorkCompareResponse {
+  const r1 = (workIndex % 1500) + 1;
+  const r2 = ((workIndex * 3) % 1500) + 1;
+  const r3 = ((workIndex * 5) % 2500) + 1;
+  const r4 = ((workIndex * 7) % 2000) + 1;
+  return {
+    work_index: workIndex,
+    total_works: 15000,
+    methods: {
+      gat: {
+        id: "gat",
+        name: "Graph Attention Network (GAT)",
+        score: 1.45,
+        global_rank: r1,
+        percentile: Number(((r1 / 15000) * 100).toFixed(2)),
+        direction: "higher_is_riskier",
+      },
+      siamese: {
+        id: "siamese",
+        name: "Siamese Network",
+        score: 0.82,
+        global_rank: r2,
+        percentile: Number(((r2 / 15000) * 100).toFixed(2)),
+        direction: "lower_is_riskier",
+      },
+      community: {
+        id: "community",
+        name: "Community Anomaly Scorer",
+        score: 0.65,
+        global_rank: r3,
+        percentile: Number(((r3 / 15000) * 100).toFixed(2)),
+        direction: "higher_is_riskier",
+      },
+      fusion: {
+        id: "fusion",
+        name: "Learned Fusion",
+        score: 0.73,
+        global_rank: r4,
+        percentile: Number(((r4 / 15000) * 100).toFixed(2)),
+        direction: "higher_is_riskier",
+      },
+    },
+  };
+}
+
+function mockEvaluation(): EvaluationResponse {
+  return {
+    review_budget_recall: [
+      {
+        Detector: "GAT (Frozen)",
+        Detector_Column: "gat_frozen",
+        Typology: "ALL (Total)",
+        Total_Injected: 430,
+        "Hits_Top 1%": 25,
+        "Recall_Top 1%": 0.058,
+        "Recall_Str_Top 1%": "5.8% (25/430)",
+        "Hits_Top 2%": 48,
+        "Recall_Top 2%": 0.112,
+        "Recall_Str_Top 2%": "11.2% (48/430)",
+        "Hits_Top 5%": 81,
+        "Recall_Top 5%": 0.188,
+        "Recall_Str_Top 5%": "18.8% (81/430)",
+        "Hits_Top 10%": 126,
+        "Recall_Top 10%": 0.293,
+        "Recall_Str_Top 10%": "29.3% (126/430)",
+      },
+      {
+        Detector: "Community Scorer",
+        Detector_Column: "community_score",
+        Typology: "ALL (Total)",
+        Total_Injected: 430,
+        "Hits_Top 1%": 20,
+        "Recall_Top 1%": 0.047,
+        "Recall_Str_Top 1%": "4.7% (20/430)",
+        "Hits_Top 2%": 40,
+        "Recall_Top 2%": 0.093,
+        "Recall_Str_Top 2%": "9.3% (40/430)",
+        "Hits_Top 5%": 75,
+        "Recall_Top 5%": 0.174,
+        "Recall_Str_Top 5%": "17.4% (75/430)",
+        "Hits_Top 10%": 110,
+        "Recall_Top 10%": 0.256,
+        "Recall_Str_Top 10%": "25.6% (110/430)",
+      },
+    ],
+    p1_pooled_summary: [
+      {
+        model: "hgbc_full",
+        mean_auprc_p1: 0.0672,
+        diff_vs_bot_mean: 0.0401,
+        diff_vs_bot_ci_95: "[+0.0259, +0.0581]",
+        pos_families_vs_bot: "6/6",
+        beats_bot_pooled: "YES",
+        diff_vs_hin_mean: -0.0546,
+        diff_vs_hin_ci_95: "[-0.0946, -0.0163]",
+        pos_families_vs_hin: "3/6",
+        beats_hin_pooled: "NO",
+      },
+      {
+        model: "logistic_full",
+        mean_auprc_p1: 0.0567,
+        diff_vs_bot_mean: 0.0282,
+        diff_vs_bot_ci_95: "[+0.0156, +0.0448]",
+        pos_families_vs_bot: "6/6",
+        beats_bot_pooled: "YES",
+        diff_vs_hin_mean: -0.0664,
+        diff_vs_hin_ci_95: "[-0.1030, -0.0293]",
+        pos_families_vs_hin: "3/6",
+        beats_hin_pooled: "NO",
+      },
+    ],
+    p2_bootstrap_primary_fgh: [
+      {
+        model: "hgbc_full",
+        mean_auprc_fgh: 0.0560,
+        diff_vs_bot_mean: 0.0251,
+        diff_vs_bot_ci_95: "[+0.0078, +0.0468]",
+        pos_typ_fgh_vs_bot: "3/3",
+        beats_bot_fgh: "YES",
+        diff_vs_hin_mean: 0.0250,
+        diff_vs_hin_ci_95: "[+0.0067, +0.0494]",
+        pos_typ_fgh_vs_hin: "3/3",
+        beats_hin_fgh: "YES",
+      },
+    ],
+    limitations: [
+      "Synthetic anomaly benchmark: Evaluations are performed against synthetically injected anomaly typologies (A-H), not verified real-world fraud convictions.",
+      "Analyst label selection bias: The 60 analyst review labels were collected from top-ranked GAT candidate lists rather than a random representative sample.",
+      "Relative triage ranking: Scores represent relative statistical anomaly rankings for review prioritisation, not calibrated posterior probabilities of misconduct.",
+      "Administrative confounding: Non-fraudulent operational practices (such as fiscal year-end sanction clustering or round-budget allotments) can trigger high scores.",
+      "Evasion generalization: Detectors trained or tuned on specified patterns may not detect novel or sophisticated evasion strategies.",
+    ],
   };
 }
 

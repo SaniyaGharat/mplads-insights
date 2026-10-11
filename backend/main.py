@@ -313,6 +313,29 @@ async def get_filter_options():
     }
 
 
+def _get_method_ranks(method_name: str) -> np.ndarray:
+    cache_key = f"{method_name}_ranks"
+    if cache_key in DATA:
+        return DATA[cache_key]
+    score_key = f"{method_name}_scores"
+    if score_key not in DATA:
+        if method_name == "gat" and os.path.exists("ml/gat_scores.npy"):
+            DATA["gat_scores"] = np.load("ml/gat_scores.npy")
+        elif "df_works" in DATA:
+            DATA[score_key] = np.zeros(len(DATA['df_works']))
+        else:
+            DATA[score_key] = np.zeros(15000)
+    scores = DATA[score_key]
+    if method_name == "siamese":
+        sorted_indices = np.argsort(scores)
+    else:
+        sorted_indices = np.argsort(-scores)
+    ranks = np.empty(len(scores), dtype=int)
+    ranks[sorted_indices] = np.arange(1, len(scores) + 1)
+    DATA[cache_key] = ranks
+    return ranks
+
+
 @app.get("/api/risk-scores")
 async def get_risk_scores(
     method: str = "gat",
@@ -327,6 +350,7 @@ async def get_risk_scores(
     min_lag: Optional[int] = None,
     max_lag: Optional[int] = None,
     label_status: Optional[str] = None,
+    flag_pct: int = 5,
 ):
     method_lower = method.lower()
     method_note = ""
@@ -359,6 +383,12 @@ async def get_risk_scores(
     # 1-based global rank for chosen method across all works
     global_ranks = np.empty(len(scores), dtype=int)
     global_ranks[sorted_indices] = np.arange(1, len(scores) + 1)
+    DATA[f"{method_lower}_ranks"] = global_ranks
+
+    # Validate review flag cutoff percentage (in {1, 5, 10})
+    if flag_pct not in (1, 5, 10):
+        flag_pct = 5
+    threshold_rank = int(len(scores) * (flag_pct / 100.0))
 
     # Labels logic
     labeled_indices = set(DATA['labels_df']['work_index'].tolist())
@@ -436,7 +466,8 @@ async def get_risk_scores(
             "status": row['Work Status'],
             "category": row['Work category'],
             "score": float(scores[idx]),
-            "label_status": row_status
+            "label_status": row_status,
+            "review_flag": bool(global_ranks[idx] <= threshold_rank),
         })
 
     return {
@@ -447,6 +478,85 @@ async def get_risk_scores(
         "method": method_lower,
         "method_note": method_note
     }
+
+
+@app.get("/api/work/{work_index}/compare")
+async def compare_work(work_index: int):
+    df_works = DATA.get('df_works')
+    if df_works is None or work_index < 0 or work_index >= len(df_works):
+        raise HTTPException(status_code=404, detail="Work index not found")
+
+    total_works = len(df_works)
+    method_defs = [
+        ("gat", "Graph Attention Network (GAT)", "higher_is_riskier"),
+        ("siamese", "Siamese Network", "lower_is_riskier"),
+        ("community", "Community Anomaly Scorer", "higher_is_riskier"),
+        ("fusion", "Learned Fusion", "higher_is_riskier"),
+    ]
+
+    methods_data = {}
+    for m_id, m_name, direction in method_defs:
+        _ = _get_method_ranks(m_id)
+        ranks = DATA[f"{m_id}_ranks"]
+        scores = DATA[f"{m_id}_scores"]
+        rank = int(ranks[work_index])
+        pct = float(round((rank / total_works) * 100, 2))
+        raw_score = float(scores[work_index])
+        methods_data[m_id] = {
+            "id": m_id,
+            "name": m_name,
+            "score": raw_score,
+            "global_rank": rank,
+            "percentile": pct,
+            "direction": direction,
+        }
+
+    return {
+        "work_index": work_index,
+        "total_works": total_works,
+        "methods": methods_data,
+    }
+
+
+EVALUATION_CACHE = {}
+
+
+@app.get("/api/evaluation")
+async def get_evaluation():
+    if "evaluation_data" in EVALUATION_CACHE:
+        return EVALUATION_CACHE["evaluation_data"]
+
+    recall_path = "data/benchmark/fix4/review_budget_recall.csv"
+    p1_path = "data/benchmark/fusion/fix2/p1_pooled_summary.csv"
+    p2_path = "data/benchmark/fusion/fix2/p2_bootstrap_primary_fgh.csv"
+
+    if not os.path.exists(recall_path) or not os.path.exists(p1_path) or not os.path.exists(p2_path):
+        raise HTTPException(status_code=503, detail="Evaluation CSV files not found")
+
+    recall_df = pd.read_csv(recall_path)
+    p1_df = pd.read_csv(p1_path)
+    p2_df = pd.read_csv(p2_path)
+
+    recall_records = recall_df.replace({np.nan: None}).to_dict(orient="records")
+    p1_records = p1_df.replace({np.nan: None}).to_dict(orient="records")
+    p2_records = p2_df.replace({np.nan: None}).to_dict(orient="records")
+
+    limitations = [
+        "Synthetic anomaly benchmark: Evaluations are performed against synthetically injected anomaly typologies (A-H), not verified real-world fraud convictions.",
+        "Analyst label selection bias: The 60 analyst review labels were collected from top-ranked GAT candidate lists rather than a random representative sample.",
+        "Relative triage ranking: Scores represent relative statistical anomaly rankings for review prioritisation, not calibrated posterior probabilities of misconduct.",
+        "Administrative confounding: Non-fraudulent operational practices (such as fiscal year-end sanction clustering or round-budget allotments) can trigger high scores.",
+        "Evasion generalization: Detectors trained or tuned on specified patterns may not detect novel or sophisticated evasion strategies."
+    ]
+
+    result = {
+        "review_budget_recall": recall_records,
+        "p1_pooled_summary": p1_records,
+        "p2_bootstrap_primary_fgh": p2_records,
+        "limitations": limitations,
+    }
+    EVALUATION_CACHE["evaluation_data"] = result
+    return result
 
 @app.get("/api/graph")
 async def get_graph(top_n: int = 50):

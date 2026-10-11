@@ -1,4 +1,12 @@
-import { formatINR, type ExplainResponse, type LabelValue, type RiskRow, type ScoringMethod } from "@/lib/api";
+import { useQuery } from "@tanstack/react-query";
+import {
+  formatINR,
+  fetchWorkCompare,
+  type ExplainResponse,
+  type LabelValue,
+  type RiskRow,
+  type ScoringMethod,
+} from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 interface Props {
@@ -9,9 +17,17 @@ interface Props {
   isMock: boolean;
   isDemo?: boolean;
   labellingEnabled?: boolean;
+  flagPct?: 1 | 5 | 10;
   feedback?: { status: "success" | "duplicate" | "error"; message: string } | null | undefined;
   onLabel: (workIndex: number, label: LabelValue) => void;
 }
+
+const METHOD_LABELS: Record<string, { name: string; tag?: string }> = {
+  gat: { name: "GAT" },
+  siamese: { name: "Siamese" },
+  community: { name: "Community" },
+  fusion: { name: "Fusion", tag: "Experimental" },
+};
 
 export function ExplainPanel({
   row,
@@ -21,9 +37,16 @@ export function ExplainPanel({
   isMock,
   isDemo = false,
   labellingEnabled = false,
+  flagPct = 5,
   feedback,
   onLabel,
 }: Props) {
+  const compareQuery = useQuery({
+    queryKey: ["work-compare", row?.work_index],
+    queryFn: () => fetchWorkCompare(row!.work_index),
+    enabled: row !== null,
+  });
+
   if (!row) {
     return (
       <div className="border border-border bg-card p-5 text-sm text-muted-foreground">
@@ -31,6 +54,9 @@ export function ExplainPanel({
       </div>
     );
   }
+
+  const compareData = compareQuery.data?.data;
+  const methodsOrder: ScoringMethod[] = ["gat", "siamese", "community", "fusion"];
 
   return (
     <div className="border border-border bg-card">
@@ -54,6 +80,100 @@ export function ExplainPanel({
           </div>
         ))}
       </dl>
+
+      {/* Compare Methods Panel */}
+      <div className="border-b border-border px-5 py-4">
+        <div className="flex items-center justify-between">
+          <h3 className="text-[11px] tracking-wider text-muted-foreground uppercase">
+            Method Comparison (All 4 Methods)
+          </h3>
+          <span className="text-[10px] text-muted-foreground">
+            Cutoff: Top {flagPct}%
+          </span>
+        </div>
+        <p className="mt-0.5 text-xs text-muted-foreground">
+          Score position and global ranking across models (15,000 total works).
+        </p>
+
+        {compareQuery.isLoading ? (
+          <p className="mt-3 text-xs text-muted-foreground">Loading method comparison…</p>
+        ) : compareData?.methods ? (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full text-left text-xs border border-border">
+              <thead>
+                <tr className="border-b border-border bg-secondary/40 text-[11px] text-muted-foreground">
+                  <th className="px-2.5 py-1.5 font-medium">Method</th>
+                  <th className="px-2.5 py-1.5 font-medium text-right">Global Rank</th>
+                  <th className="px-2.5 py-1.5 font-medium text-right">Percentile</th>
+                  <th className="px-2.5 py-1.5 font-medium text-right">Score</th>
+                  <th className="px-2.5 py-1.5 font-medium text-center">Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {methodsOrder.map((mKey) => {
+                  const mInfo = compareData.methods[mKey];
+                  const meta = METHOD_LABELS[mKey] ?? { name: mKey };
+                  const isCurrent = method === mKey;
+                  const isFlagged = mInfo ? mInfo.percentile <= flagPct : false;
+
+                  return (
+                    <tr
+                      key={mKey}
+                      className={cn(
+                        "transition-colors",
+                        isCurrent ? "bg-primary/5 font-medium" : "hover:bg-muted/40",
+                      )}
+                    >
+                      <td className="px-2.5 py-2">
+                        <div className="flex items-center gap-1.5">
+                          <span className={cn(isCurrent && "font-semibold text-foreground")}>
+                            {meta.name}
+                          </span>
+                          {meta.tag && (
+                            <span className="rounded bg-amber-500/15 px-1 py-0.2 text-[9px] font-semibold text-amber-700 dark:text-amber-400">
+                              {meta.tag}
+                            </span>
+                          )}
+                          {isCurrent && (
+                            <span className="rounded bg-secondary px-1 text-[9px] text-muted-foreground">
+                              active
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-2.5 py-2 text-right font-mono tabular-nums">
+                        {mInfo ? `#${mInfo.global_rank.toLocaleString("en-IN")}` : "—"}
+                      </td>
+                      <td className="px-2.5 py-2 text-right font-mono tabular-nums">
+                        {mInfo ? `Top ${mInfo.percentile.toFixed(1)}%` : "—"}
+                      </td>
+                      <td className="px-2.5 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                        {mInfo ? mInfo.score.toFixed(3) : "—"}
+                      </td>
+                      <td className="px-2.5 py-2 text-center">
+                        <span
+                          className={cn(
+                            "inline-block rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight",
+                            isFlagged
+                              ? "bg-amber-500/15 text-amber-800 dark:text-amber-300"
+                              : "bg-muted text-muted-foreground",
+                          )}
+                        >
+                          {isFlagged ? "Flag for review" : "Not flagged"}
+                        </span>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="mt-3 text-xs text-muted-foreground italic">
+            Comparison data unavailable.
+          </p>
+        )}
+      </div>
 
       {method === "gat" ? (
         <div className="px-5 py-4">

@@ -24,6 +24,7 @@ import { RiskTable } from "@/components/mplads/RiskTable";
 import { StatsOverview } from "@/components/mplads/StatsOverview";
 import { ExplainPanel } from "@/components/mplads/ExplainPanel";
 import { NetworkGraph } from "@/components/mplads/NetworkGraph";
+import { EvaluationTab } from "@/components/mplads/EvaluationTab";
 
 const TITLE = "MPLADS Anomaly Detection";
 const DESCRIPTION =
@@ -50,6 +51,10 @@ function parseUrlParams() {
   const sp = new URLSearchParams(window.location.search);
   const m = sp.get("method")?.toLowerCase();
   const validMethods: ScoringMethod[] = ["gat", "siamese", "community", "fusion"];
+  const flagPctParam = Number(sp.get("flag_pct"));
+  const flagPctVal: 1 | 5 | 10 = flagPctParam === 1 || flagPctParam === 10 ? flagPctParam : 5;
+  const tabVal: "triage" | "evaluation" = sp.get("tab") === "evaluation" ? "evaluation" : "triage";
+
   return {
     method: validMethods.includes(m as ScoringMethod) ? (m as ScoringMethod) : ("gat" as ScoringMethod),
     page: Math.max(1, parseInt(sp.get("page") || "1", 10) || 1),
@@ -62,10 +67,14 @@ function parseUrlParams() {
     minLag: sp.get("min_lag") || "",
     maxLag: sp.get("max_lag") || "",
     labelStatus: sp.get("label_status") || "",
+    flagPct: flagPctVal,
+    tab: tabVal,
   };
 }
 
 function Dashboard() {
+  const [activeTab, setActiveTab] = useState<"triage" | "evaluation">("triage");
+  const [flagPct, setFlagPct] = useState<1 | 5 | 10>(5);
   const [method, setMethod] = useState<ScoringMethod>("gat");
   const [page, setPage] = useState<number>(1);
   const [searchInput, setSearchInput] = useState<string>("");
@@ -105,6 +114,8 @@ function Dashboard() {
       if (p.minLag) setMinLag(p.minLag);
       if (p.maxLag) setMaxLag(p.maxLag);
       if (p.labelStatus) setLabelStatus(p.labelStatus);
+      if (p.flagPct !== 5) setFlagPct(p.flagPct);
+      if (p.tab !== "triage") setActiveTab(p.tab);
     }
   }, []);
 
@@ -135,6 +146,8 @@ function Dashboard() {
     if (minLag.trim()) sp.set("min_lag", minLag.trim());
     if (maxLag.trim()) sp.set("max_lag", maxLag.trim());
     if (labelStatus.trim()) sp.set("label_status", labelStatus.trim());
+    if (flagPct !== 5) sp.set("flag_pct", String(flagPct));
+    if (activeTab !== "triage") sp.set("tab", activeTab);
 
     const qs = sp.toString();
     const targetUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
@@ -152,6 +165,8 @@ function Dashboard() {
     minLag,
     maxLag,
     labelStatus,
+    flagPct,
+    activeTab,
   ]);
 
   // Handle browser back/forward buttons
@@ -171,6 +186,8 @@ function Dashboard() {
       setMinLag(p.minLag);
       setMaxLag(p.maxLag);
       setLabelStatus(p.labelStatus);
+      setFlagPct(p.flagPct);
+      setActiveTab(p.tab);
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
@@ -213,6 +230,7 @@ function Dashboard() {
       min_lag: minLag,
       max_lag: maxLag,
       label_status: labelStatus,
+      flag_pct: flagPct,
     }),
     [
       debouncedSearch,
@@ -224,6 +242,7 @@ function Dashboard() {
       minLag,
       maxLag,
       labelStatus,
+      flagPct,
     ],
   );
 
@@ -241,6 +260,7 @@ function Dashboard() {
       minLag,
       maxLag,
       labelStatus,
+      flagPct,
     ],
     queryFn: () => fetchRiskScores(method, page, PAGE_SIZE, activeFilters),
     placeholderData: keepPreviousData,
@@ -400,426 +420,491 @@ function Dashboard() {
           </div>
         </header>
 
-        <main className="mx-auto grid max-w-[1600px] gap-5 px-6 py-6 xl:grid-cols-[minmax(0,1fr)_420px]">
-          <div className="xl:col-span-2">
-            <StatsOverview
-              stats={stats.data?.data ?? null}
-              isLoading={stats.isLoading}
-              isMock={stats.data?.source === "mock"}
-              error={stats.data?.error}
-              flaggedCount={flaggedCount}
-            />
+        {/* Top-Level Navigation Tabs */}
+        <nav className="border-b border-border bg-card">
+          <div className="mx-auto flex max-w-[1600px] gap-1 px-6">
+            <button
+              onClick={() => setActiveTab("triage")}
+              className={cn(
+                "border-b-2 px-5 py-3 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer",
+                activeTab === "triage"
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
+              )}
+            >
+              Triage Console
+            </button>
+            <button
+              onClick={() => setActiveTab("evaluation")}
+              className={cn(
+                "border-b-2 px-5 py-3 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer",
+                activeTab === "evaluation"
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
+              )}
+            >
+              Evaluation & Benchmarks
+            </button>
           </div>
+        </nav>
 
-          <section className="border border-border bg-card">
-            <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-5 py-3">
-              <div>
-                <h2 className="text-base font-semibold">Risk-ranked sanctioned works</h2>
-                <p className="mt-0.5 text-xs text-muted-foreground">
-                  Showing {total.toLocaleString("en-IN")} of 15,000 · page {page} of{" "}
-                  {pageCount.toLocaleString("en-IN")}
-                </p>
-                {!labellingEnabled && (
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Labels shown are the 60 analyst labels collected offline; labelling is disabled in this deployment.
+        {activeTab === "evaluation" ? (
+          <main className="mx-auto max-w-[1600px] px-6 py-6">
+            <EvaluationTab />
+          </main>
+        ) : (
+          <main className="mx-auto grid max-w-[1600px] gap-5 px-6 py-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+            <div className="xl:col-span-2">
+              <StatsOverview
+                stats={stats.data?.data ?? null}
+                isLoading={stats.isLoading}
+                isMock={stats.data?.source === "mock"}
+                error={stats.data?.error}
+                flaggedCount={flaggedCount}
+              />
+            </div>
+
+            <section className="border border-border bg-card">
+              <div className="flex flex-wrap items-center justify-between gap-4 border-b border-border px-5 py-3">
+                <div>
+                  <h2 className="text-base font-semibold">Risk-ranked sanctioned works</h2>
+                  <p className="mt-0.5 text-xs text-muted-foreground">
+                    Showing {total.toLocaleString("en-IN")} of 15,000 · page {page} of{" "}
+                    {pageCount.toLocaleString("en-IN")}
                   </p>
-                )}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-[11px] tracking-wider text-muted-foreground uppercase">
-                  Scoring Method
-                </span>
-                <div className="flex border border-border">
-                  {methodList.map((m) => {
-                    const isSelected = method === m.id;
-                    return (
-                      <button
-                        key={m.id}
-                        onClick={() => {
-                          setMethod(m.id);
-                          setPage(1);
-                          setSelected(null);
-                        }}
-                        className={cn(
-                          "px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5",
-                          isSelected
-                            ? "bg-navy text-navy-foreground"
-                            : "text-muted-foreground hover:bg-muted",
-                        )}
-                      >
-                        <span>
-                          {m.id === "gat"
-                            ? "GAT"
-                            : m.id === "siamese"
-                            ? "Siamese"
-                            : m.id === "community"
-                            ? "Community"
-                            : "Fusion"}
-                        </span>
-                        {m.id === "fusion" && (
-                          <span
+                  {!labellingEnabled && (
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Labels shown are the 60 analyst labels collected offline; labelling is disabled in this deployment.
+                    </p>
+                  )}
+                </div>
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Scoring Method */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] tracking-wider text-muted-foreground uppercase">
+                      Scoring Method
+                    </span>
+                    <div className="flex border border-border">
+                      {methodList.map((m) => {
+                        const isSelected = method === m.id;
+                        return (
+                          <button
+                            key={m.id}
+                            onClick={() => {
+                              setMethod(m.id);
+                              setPage(1);
+                              setSelected(null);
+                            }}
                             className={cn(
-                              "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                              "px-3 py-1.5 text-xs font-medium cursor-pointer transition-colors flex items-center gap-1.5",
                               isSelected
-                                ? "bg-amber-400 text-amber-950"
-                                : "bg-amber-500/20 text-amber-600 dark:text-amber-400",
+                                ? "bg-navy text-navy-foreground"
+                                : "text-muted-foreground hover:bg-muted",
                             )}
                           >
-                            Experimental
-                          </span>
-                        )}
-                      </button>
-                    );
-                  })}
+                            <span>
+                              {m.id === "gat"
+                                ? "GAT"
+                                : m.id === "siamese"
+                                ? "Siamese"
+                                : m.id === "community"
+                                ? "Community"
+                                : "Fusion"}
+                            </span>
+                            {m.id === "fusion" && (
+                              <span
+                                className={cn(
+                                  "rounded px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
+                                  isSelected
+                                    ? "bg-amber-400 text-amber-950"
+                                    : "bg-amber-500/20 text-amber-600 dark:text-amber-400",
+                                )}
+                              >
+                                Experimental
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* Review Cutoff Selector */}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[11px] tracking-wider text-muted-foreground uppercase">
+                      Review Cutoff
+                    </span>
+                    <div className="flex border border-border">
+                      {([1, 5, 10] as const).map((pct) => (
+                        <button
+                          key={pct}
+                          onClick={() => {
+                            setFlagPct(pct);
+                            setPage(1);
+                          }}
+                          className={cn(
+                            "px-2.5 py-1.5 text-xs font-medium cursor-pointer transition-colors",
+                            flagPct === pct
+                              ? "bg-navy text-navy-foreground"
+                              : "text-muted-foreground hover:bg-muted",
+                          )}
+                        >
+                          Top {pct}%
+                        </button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
               </div>
-            </div>
 
-            {/* Method Note Banner */}
-            {methodNote && (
-              <div
-                className={cn(
-                  "flex items-start gap-2.5 border-b px-5 py-3 text-xs",
-                  method === "fusion"
-                    ? "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200"
-                    : "border-border bg-secondary/50 text-foreground/80",
-                )}
-              >
-                <span
+              {/* Method Note Banner */}
+              {methodNote && (
+                <div
                   className={cn(
-                    "font-bold text-sm leading-none mt-0.5",
+                    "flex items-start gap-2.5 border-b px-5 py-3 text-xs",
                     method === "fusion"
-                      ? "text-amber-600 dark:text-amber-400"
-                      : "text-muted-foreground",
+                      ? "border-amber-500/40 bg-amber-500/10 text-amber-900 dark:text-amber-200"
+                      : "border-border bg-secondary/50 text-foreground/80",
                   )}
-                  aria-hidden="true"
                 >
-                  {method === "fusion" ? "⚠️" : "ℹ️"}
-                </span>
-                <div className="flex-1">
                   <span
                     className={cn(
-                      "font-semibold",
+                      "font-bold text-sm leading-none mt-0.5",
                       method === "fusion"
-                        ? "text-amber-800 dark:text-amber-300"
-                        : "text-foreground",
+                        ? "text-amber-600 dark:text-amber-400"
+                        : "text-muted-foreground",
                     )}
+                    aria-hidden="true"
                   >
-                    {method === "fusion" ? "Method Note (Experimental): " : "Method Note: "}
+                    {method === "fusion" ? "⚠️" : "ℹ️"}
                   </span>
-                  <span>{methodNote}</span>
-                  {currentMethod?.direction === "lower_is_riskier" && (
-                    <span className="ml-1.5 font-medium text-muted-foreground">
-                      (Note: lower scores indicate higher risk)
+                  <div className="flex-1">
+                    <span
+                      className={cn(
+                        "font-semibold",
+                        method === "fusion"
+                          ? "text-amber-800 dark:text-amber-300"
+                          : "text-foreground",
+                      )}
+                    >
+                      {method === "fusion" ? "Method Note (Experimental): " : "Method Note: "}
                     </span>
-                  )}
+                    <span>{methodNote}</span>
+                    {currentMethod?.direction === "lower_is_riskier" && (
+                      <span className="ml-1.5 font-medium text-muted-foreground">
+                        (Note: lower scores indicate higher risk)
+                      </span>
+                    )}
+                  </div>
                 </div>
+              )}
+
+              {/* Disclaimer Banner */}
+              <div className="border-b border-border bg-secondary/30 px-5 py-2 text-xs text-muted-foreground">
+                Scores are for audit prioritisation only and are based on model output.
               </div>
-            )}
 
-            {/* Disclaimer Banner */}
-            <div className="border-b border-border bg-secondary/30 px-5 py-2 text-xs text-muted-foreground">
-              Scores are for audit prioritisation only and are based on model output.
-            </div>
+              {/* Filter Controls Bar */}
+              <div className="border-b border-border bg-card px-5 py-3 space-y-3">
+                <div className="flex flex-wrap items-end gap-3">
+                  {/* Search */}
+                  <div className="flex-1 min-w-[200px]">
+                    <label
+                      htmlFor="filter-search"
+                      className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
+                    >
+                      MP Search
+                    </label>
+                    <input
+                      id="filter-search"
+                      type="text"
+                      value={searchInput}
+                      onChange={(e) => setSearchInput(e.target.value)}
+                      placeholder="Search MP name..."
+                      className="w-full border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
 
-            {/* Filter Controls Bar */}
-            <div className="border-b border-border bg-card px-5 py-3 space-y-3">
-              <div className="flex flex-wrap items-end gap-3">
-                {/* Search */}
-                <div className="flex-1 min-w-[200px]">
-                  <label
-                    htmlFor="filter-search"
-                    className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
-                  >
-                    MP Search
-                  </label>
-                  <input
-                    id="filter-search"
-                    type="text"
-                    value={searchInput}
-                    onChange={(e) => setSearchInput(e.target.value)}
-                    placeholder="Search MP name..."
-                    className="w-full border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
-                  />
-                </div>
-
-                {/* State */}
-                <div className="w-[170px]">
-                  <label
-                    htmlFor="filter-state"
-                    className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
-                  >
-                    State
-                  </label>
-                  <select
-                    id="filter-state"
-                    value={selectedState}
-                    onChange={(e) => {
-                      const val = e.target.value;
-                      setSelectedState(val);
-                      setSelectedDistrict("");
-                      setPage(1);
-                    }}
-                    className="w-full border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    <option value="">All States</option>
-                    {(filterOptions?.states ?? []).map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-                {/* District (depends on State) */}
-                <div className="w-[170px]">
-                  <label
-                    htmlFor="filter-district"
-                    className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
-                  >
-                    District
-                  </label>
-                  <select
-                    id="filter-district"
-                    value={selectedDistrict}
-                    disabled={!selectedState}
-                    onChange={(e) => {
-                      setSelectedDistrict(e.target.value);
-                      setPage(1);
-                    }}
-                    className="w-full border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <option value="">
-                      {selectedState ? "All Districts" : "Select a State first"}
-                    </option>
-                    {selectedState &&
-                      (filterOptions?.districts_by_state?.[selectedState] ?? []).map((d) => (
-                        <option key={d} value={d}>
-                          {d}
+                  {/* State */}
+                  <div className="w-[170px]">
+                    <label
+                      htmlFor="filter-state"
+                      className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
+                    >
+                      State
+                    </label>
+                    <select
+                      id="filter-state"
+                      value={selectedState}
+                      onChange={(e) => {
+                        const val = e.target.value;
+                        setSelectedState(val);
+                        setSelectedDistrict("");
+                        setPage(1);
+                      }}
+                      className="w-full border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="">All States</option>
+                      {(filterOptions?.states ?? []).map((s) => (
+                        <option key={s} value={s}>
+                          {s}
                         </option>
                       ))}
-                  </select>
-                </div>
+                    </select>
+                  </div>
 
-                {/* Status */}
-                <div className="w-[160px]">
-                  <label
-                    htmlFor="filter-status"
-                    className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
-                  >
-                    Status
-                  </label>
-                  <select
-                    id="filter-status"
-                    value={selectedStatus}
-                    onChange={(e) => {
-                      setSelectedStatus(e.target.value);
-                      setPage(1);
-                    }}
-                    className="w-full border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    <option value="">All Statuses</option>
-                    {(filterOptions?.statuses ?? []).map((st) => (
-                      <option key={st} value={st}>
-                        {st}
+                  {/* District (depends on State) */}
+                  <div className="w-[170px]">
+                    <label
+                      htmlFor="filter-district"
+                      className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
+                    >
+                      District
+                    </label>
+                    <select
+                      id="filter-district"
+                      value={selectedDistrict}
+                      disabled={!selectedState}
+                      onChange={(e) => {
+                        setSelectedDistrict(e.target.value);
+                        setPage(1);
+                      }}
+                      className="w-full border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      <option value="">
+                        {selectedState ? "All Districts" : "Select a State first"}
                       </option>
-                    ))}
-                  </select>
+                      {selectedState &&
+                        (filterOptions?.districts_by_state?.[selectedState] ?? []).map((d) => (
+                          <option key={d} value={d}>
+                            {d}
+                          </option>
+                        ))}
+                    </select>
+                  </div>
+
+                  {/* Status */}
+                  <div className="w-[160px]">
+                    <label
+                      htmlFor="filter-status"
+                      className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
+                    >
+                      Status
+                    </label>
+                    <select
+                      id="filter-status"
+                      value={selectedStatus}
+                      onChange={(e) => {
+                        setSelectedStatus(e.target.value);
+                        setPage(1);
+                      }}
+                      className="w-full border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="">All Statuses</option>
+                      {(filterOptions?.statuses ?? []).map((st) => (
+                        <option key={st} value={st}>
+                          {st}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  {/* Label Status */}
+                  <div className="w-[140px]">
+                    <label
+                      htmlFor="filter-label-status"
+                      className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
+                    >
+                      Label Status
+                    </label>
+                    <select
+                      id="filter-label-status"
+                      value={labelStatus}
+                      onChange={(e) => {
+                        setLabelStatus(e.target.value);
+                        setPage(1);
+                      }}
+                      className="w-full border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                    >
+                      <option value="">All Labels</option>
+                      <option value="TRAINING LABEL">Training Label</option>
+                      <option value="GAT-TOP">GAT-Top</option>
+                      <option value="NEW">New</option>
+                    </select>
+                  </div>
                 </div>
 
-                {/* Label Status */}
-                <div className="w-[140px]">
-                  <label
-                    htmlFor="filter-label-status"
-                    className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
-                  >
-                    Label Status
-                  </label>
-                  <select
-                    id="filter-label-status"
-                    value={labelStatus}
-                    onChange={(e) => {
-                      setLabelStatus(e.target.value);
-                      setPage(1);
-                    }}
-                    className="w-full border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
-                  >
-                    <option value="">All Labels</option>
-                    <option value="TRAINING LABEL">Training Label</option>
-                    <option value="GAT-TOP">GAT-Top</option>
-                    <option value="NEW">New</option>
-                  </select>
+                {/* Second Row: Amount and Lag ranges + Clear Filters + Showing X of 15,000 */}
+                <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-border/50 text-xs">
+                  <div className="flex flex-wrap items-center gap-4">
+                    {/* Amount Range */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Amount (₹):
+                      </span>
+                      <input
+                        type="number"
+                        placeholder="Min ₹"
+                        value={minAmount}
+                        onChange={(e) => {
+                          setMinAmount(e.target.value);
+                          setPage(1);
+                        }}
+                        className="w-24 border border-border bg-background px-2 py-1 text-xs text-foreground font-mono placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
+                      />
+                      <span className="text-muted-foreground">–</span>
+                      <input
+                        type="number"
+                        placeholder="Max ₹"
+                        value={maxAmount}
+                        onChange={(e) => {
+                          setMaxAmount(e.target.value);
+                          setPage(1);
+                        }}
+                        className="w-24 border border-border bg-background px-2 py-1 text-xs text-foreground font-mono placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
+                      />
+                    </div>
+
+                    {/* Lag Range */}
+                    <div className="flex items-center gap-1.5">
+                      <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        Lag (days):
+                      </span>
+                      <input
+                        type="number"
+                        placeholder="Min"
+                        value={minLag}
+                        onChange={(e) => {
+                          setMinLag(e.target.value);
+                          setPage(1);
+                        }}
+                        className="w-16 border border-border bg-background px-2 py-1 text-xs text-foreground font-mono placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
+                      />
+                      <span className="text-muted-foreground">–</span>
+                      <input
+                        type="number"
+                        placeholder="Max"
+                        value={maxLag}
+                        onChange={(e) => {
+                          setMaxLag(e.target.value);
+                          setPage(1);
+                        }}
+                        className="w-16 border border-border bg-background px-2 py-1 text-xs text-foreground font-mono placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
+                      />
+                    </div>
+
+                    {/* Clear filters button */}
+                    <button
+                      onClick={clearFilters}
+                      disabled={!hasActiveFilters}
+                      className={cn(
+                        "border border-border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer",
+                        hasActiveFilters
+                          ? "text-foreground hover:bg-muted"
+                          : "opacity-40 cursor-not-allowed text-muted-foreground",
+                      )}
+                    >
+                      Clear filters
+                    </button>
+                  </div>
+
+                  {/* Showing X of 15,000 */}
+                  <div className="flex items-center gap-2">
+                    <span className="border border-border bg-secondary/60 px-2.5 py-1 text-xs font-medium text-foreground tabular-nums">
+                      Showing {total.toLocaleString("en-IN")} of 15,000
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              {/* Second Row: Amount and Lag ranges + Clear Filters + Showing X of 15,000 */}
-              <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-border/50 text-xs">
-                <div className="flex flex-wrap items-center gap-4">
-                  {/* Amount Range */}
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      Amount (₹):
-                    </span>
-                    <input
-                      type="number"
-                      placeholder="Min ₹"
-                      value={minAmount}
-                      onChange={(e) => {
-                        setMinAmount(e.target.value);
-                        setPage(1);
-                      }}
-                      className="w-24 border border-border bg-background px-2 py-1 text-xs text-foreground font-mono placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                    <span className="text-muted-foreground">–</span>
-                    <input
-                      type="number"
-                      placeholder="Max ₹"
-                      value={maxAmount}
-                      onChange={(e) => {
-                        setMaxAmount(e.target.value);
-                        setPage(1);
-                      }}
-                      className="w-24 border border-border bg-background px-2 py-1 text-xs text-foreground font-mono placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                  </div>
+              {scores.isLoading ? (
+                <p className="px-5 py-12 text-sm text-muted-foreground">Loading triage scores…</p>
+              ) : (
+                <RiskTable
+                  rows={rows}
+                  offset={(page - 1) * PAGE_SIZE}
+                  total={total}
+                  selected={selected?.work_index ?? null}
+                  isLoading={scores.isFetching}
+                  isDemo={isAnyMock}
+                  labellingEnabled={labellingEnabled}
+                  method={method}
+                  direction={currentMethod?.direction}
+                  flagPct={flagPct}
+                  rowFeedback={rowFeedback}
+                  onSelect={setSelected}
+                  onLabel={onLabel}
+                />
+              )}
 
-                  {/* Lag Range */}
-                  <div className="flex items-center gap-1.5">
-                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
-                      Lag (days):
-                    </span>
-                    <input
-                      type="number"
-                      placeholder="Min"
-                      value={minLag}
-                      onChange={(e) => {
-                        setMinLag(e.target.value);
-                        setPage(1);
-                      }}
-                      className="w-16 border border-border bg-background px-2 py-1 text-xs text-foreground font-mono placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                    <span className="text-muted-foreground">–</span>
-                    <input
-                      type="number"
-                      placeholder="Max"
-                      value={maxLag}
-                      onChange={(e) => {
-                        setMaxLag(e.target.value);
-                        setPage(1);
-                      }}
-                      className="w-16 border border-border bg-background px-2 py-1 text-xs text-foreground font-mono placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
-                    />
-                  </div>
-
-                  {/* Clear filters button */}
-                  <button
-                    onClick={clearFilters}
-                    disabled={!hasActiveFilters}
-                    className={cn(
-                      "border border-border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer",
-                      hasActiveFilters
-                        ? "text-foreground hover:bg-muted"
-                        : "opacity-40 cursor-not-allowed text-muted-foreground",
-                    )}
-                  >
-                    Clear filters
-                  </button>
-                </div>
-
-                {/* Showing X of 15,000 */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 text-xs">
+                <span className="text-muted-foreground">
+                  {total === 0
+                    ? "No matching records"
+                    : `Rows ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)}`}
+                </span>
                 <div className="flex items-center gap-2">
-                  <span className="border border-border bg-secondary/60 px-2.5 py-1 text-xs font-medium text-foreground tabular-nums">
-                    Showing {total.toLocaleString("en-IN")} of 15,000
-                  </span>
+                  <PagerButton disabled={page === 1} onClick={() => setPage(1)} label="First" />
+                  <PagerButton
+                    disabled={page === 1}
+                    onClick={() => setPage((p) => p - 1)}
+                    label="Previous"
+                  />
+                  <input
+                    type="number"
+                    min={1}
+                    max={pageCount}
+                    value={page}
+                    onChange={(e) => {
+                      const v = Number(e.target.value);
+                      if (v >= 1 && v <= pageCount) setPage(v);
+                    }}
+                    className="w-20 border border-border bg-background px-2 py-1 text-center font-mono tabular-nums"
+                  />
+                  <PagerButton
+                    disabled={page >= pageCount}
+                    onClick={() => setPage((p) => p + 1)}
+                    label="Next"
+                  />
+                  <PagerButton
+                    disabled={page >= pageCount}
+                    onClick={() => setPage(pageCount)}
+                    label="Last"
+                  />
                 </div>
               </div>
-            </div>
+            </section>
 
-            {scores.isLoading ? (
-              <p className="px-5 py-12 text-sm text-muted-foreground">Loading triage scores…</p>
-            ) : (
-              <RiskTable
-                rows={rows}
-                offset={(page - 1) * PAGE_SIZE}
-                total={total}
-                selected={selected?.work_index ?? null}
-                isLoading={scores.isFetching}
+            <aside className="flex flex-col gap-5">
+              <ExplainPanel
+                row={selected}
+                method={method}
+                explain={explain.data?.data ?? null}
+                isLoading={explain.isFetching}
+                isMock={explain.data?.source === "mock"}
                 isDemo={isAnyMock}
                 labellingEnabled={labellingEnabled}
-                method={method}
-                direction={currentMethod?.direction}
-                rowFeedback={rowFeedback}
-                onSelect={setSelected}
+                flagPct={flagPct}
+                feedback={selected ? rowFeedback[selected.work_index] : null}
                 onLabel={onLabel}
               />
-            )}
+            </aside>
 
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 text-xs">
-              <span className="text-muted-foreground">
-                {total === 0
-                  ? "No matching records"
-                  : `Rows ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)}`}
-              </span>
-              <div className="flex items-center gap-2">
-                <PagerButton disabled={page === 1} onClick={() => setPage(1)} label="First" />
-                <PagerButton
-                  disabled={page === 1}
-                  onClick={() => setPage((p) => p - 1)}
-                  label="Previous"
-                />
-                <input
-                  type="number"
-                  min={1}
-                  max={pageCount}
-                  value={page}
-                  onChange={(e) => {
-                    const v = Number(e.target.value);
-                    if (v >= 1 && v <= pageCount) setPage(v);
-                  }}
-                  className="w-20 border border-border bg-background px-2 py-1 text-center font-mono tabular-nums"
-                />
-                <PagerButton
-                  disabled={page >= pageCount}
-                  onClick={() => setPage((p) => p + 1)}
-                  label="Next"
-                />
-                <PagerButton
-                  disabled={page >= pageCount}
-                  onClick={() => setPage(pageCount)}
-                  label="Last"
-                />
-              </div>
+            <div className="xl:col-span-2">
+              <NetworkGraph
+                graph={graph.data?.data ?? null}
+                isLoading={graph.isLoading}
+                isMock={graph.data?.source === "mock"}
+                flaggedCount={flaggedCount}
+                selectedWorkIndex={selected?.work_index ?? null}
+                onSelectEdge={(workIndex) => {
+                  const row = rows.find((r) => r.work_index === workIndex);
+                  if (row) setSelected(row);
+                }}
+              />
             </div>
-          </section>
-
-          <aside className="flex flex-col gap-5">
-            <ExplainPanel
-              row={selected}
-              method={method}
-              explain={explain.data?.data ?? null}
-              isLoading={explain.isFetching}
-              isMock={explain.data?.source === "mock"}
-              isDemo={isAnyMock}
-              labellingEnabled={labellingEnabled}
-              feedback={selected ? rowFeedback[selected.work_index] : null}
-              onLabel={onLabel}
-            />
-          </aside>
-
-          <div className="xl:col-span-2">
-            <NetworkGraph
-              graph={graph.data?.data ?? null}
-              isLoading={graph.isLoading}
-              isMock={graph.data?.source === "mock"}
-              flaggedCount={flaggedCount}
-              selectedWorkIndex={selected?.work_index ?? null}
-              onSelectEdge={(workIndex) => {
-                const row = rows.find((r) => r.work_index === workIndex);
-                if (row) setSelected(row);
-              }}
-            />
-          </div>
-        </main>
+          </main>
+        )}
       </div>
 
       <footer className="border-t border-border bg-card py-5 text-center text-xs text-muted-foreground">

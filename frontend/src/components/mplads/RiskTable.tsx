@@ -48,6 +48,7 @@ interface Props {
   method?: ScoringMethod;
   direction?: "higher_is_riskier" | "lower_is_riskier" | undefined;
   rowFeedback?: Record<number, { status: "success" | "duplicate" | "error"; message: string }>;
+  flagPct?: number;
   onSelect: (row: RiskRow) => void;
   onLabel: (workIndex: number, label: LabelValue) => void;
 }
@@ -63,6 +64,7 @@ export function RiskTable({
   method = "gat",
   direction,
   rowFeedback,
+  flagPct = 5,
   onSelect,
   onLabel,
 }: Props) {
@@ -88,9 +90,12 @@ export function RiskTable({
     scoreHeader,
     "Percentile",
     "Band",
+    "Review flag",
     "Label Status",
     ...(labellingEnabled ? ["Mark"] : []),
   ];
+
+  const reviewFlagTooltip = `Flags works ranked in the top ${flagPct}% for the selected scoring method. This is an audit prioritisation rule, not a finding of misconduct.`;
 
   const scoreHeaderTooltip =
     method === "siamese"
@@ -141,6 +146,13 @@ export function RiskTable({
                         Ranks are global (all 15,000 works)
                       </span>
                     </div>
+                  ) : h === "Review flag" ? (
+                    <span
+                      title={reviewFlagTooltip}
+                      className="cursor-help underline decoration-dotted underline-offset-2"
+                    >
+                      Review Flag
+                    </span>
                   ) : isScoreCol ? (
                     <span
                       title={scoreHeaderTooltip}
@@ -211,6 +223,23 @@ export function RiskTable({
                 </td>
                 <td className="px-3 py-2">
                   <BandBadge band={band} />
+                </td>
+                <td className="px-3 py-2 whitespace-nowrap">
+                  <span
+                    title={
+                      row.review_flag
+                        ? `Ranked within the top ${flagPct}% of this method. For review prioritisation; not a finding of misconduct.`
+                        : `Ranked outside top ${flagPct}%. Not flagged for review.`
+                    }
+                    className={cn(
+                      "inline-block border px-1.5 py-0.5 text-[11px] font-medium tracking-wide uppercase cursor-help",
+                      row.review_flag
+                        ? "border-foreground/35 bg-secondary text-foreground font-semibold"
+                        : "border-border/50 bg-muted/30 text-muted-foreground font-normal",
+                    )}
+                  >
+                    {row.review_flag ? "Flag for review" : "Not flagged"}
+                  </span>
                 </td>
                 <td className="px-3 py-2">
                   <LabelBadge value={row.label_status} />
