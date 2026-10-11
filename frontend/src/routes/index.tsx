@@ -45,22 +45,8 @@ export const Route = createFileRoute("/")({
 
 const PAGE_SIZE = 50;
 
-function getInitialParams() {
-  if (typeof window === "undefined") {
-    return {
-      method: "gat" as ScoringMethod,
-      page: 1,
-      search: "",
-      state: "",
-      district: "",
-      status: "",
-      minAmount: "",
-      maxAmount: "",
-      minLag: "",
-      maxLag: "",
-      labelStatus: "",
-    };
-  }
+function parseUrlParams() {
+  if (typeof window === "undefined") return null;
   const sp = new URLSearchParams(window.location.search);
   const m = sp.get("method")?.toLowerCase();
   const validMethods: ScoringMethod[] = ["gat", "siamese", "community", "fusion"];
@@ -80,19 +66,19 @@ function getInitialParams() {
 }
 
 function Dashboard() {
-  const initial = useMemo(() => getInitialParams(), []);
-  const [method, setMethod] = useState<ScoringMethod>(initial.method);
-  const [page, setPage] = useState<number>(initial.page);
-  const [searchInput, setSearchInput] = useState<string>(initial.search);
-  const [debouncedSearch, setDebouncedSearch] = useState<string>(initial.search);
-  const [selectedState, setSelectedState] = useState<string>(initial.state);
-  const [selectedDistrict, setSelectedDistrict] = useState<string>(initial.district);
-  const [selectedStatus, setSelectedStatus] = useState<string>(initial.status);
-  const [minAmount, setMinAmount] = useState<string>(initial.minAmount);
-  const [maxAmount, setMaxAmount] = useState<string>(initial.maxAmount);
-  const [minLag, setMinLag] = useState<string>(initial.minLag);
-  const [maxLag, setMaxLag] = useState<string>(initial.maxLag);
-  const [labelStatus, setLabelStatus] = useState<string>(initial.labelStatus);
+  const [method, setMethod] = useState<ScoringMethod>("gat");
+  const [page, setPage] = useState<number>(1);
+  const [searchInput, setSearchInput] = useState<string>("");
+  const [debouncedSearch, setDebouncedSearch] = useState<string>("");
+  const [selectedState, setSelectedState] = useState<string>("");
+  const [selectedDistrict, setSelectedDistrict] = useState<string>("");
+  const [selectedStatus, setSelectedStatus] = useState<string>("");
+  const [minAmount, setMinAmount] = useState<string>("");
+  const [maxAmount, setMaxAmount] = useState<string>("");
+  const [minLag, setMinLag] = useState<string>("");
+  const [maxLag, setMaxLag] = useState<string>("");
+  const [labelStatus, setLabelStatus] = useState<string>("");
+  const [isMounted, setIsMounted] = useState<boolean>(false);
 
   const [selected, setSelected] = useState<RiskRow | null>(null);
   const [totals, setTotals] = useState<LabelTotals>({ s: 0, n: 0, skip: 0 });
@@ -100,8 +86,31 @@ function Dashboard() {
     Record<number, { status: "success" | "duplicate" | "error"; message: string }>
   >({});
 
+  // Parse URL search params once on client mount to prevent SSR hydration mismatch
+  useEffect(() => {
+    setIsMounted(true);
+    const p = parseUrlParams();
+    if (p) {
+      if (p.method !== "gat") setMethod(p.method);
+      if (p.page !== 1) setPage(p.page);
+      if (p.search) {
+        setSearchInput(p.search);
+        setDebouncedSearch(p.search);
+      }
+      if (p.state) setSelectedState(p.state);
+      if (p.district) setSelectedDistrict(p.district);
+      if (p.status) setSelectedStatus(p.status);
+      if (p.minAmount) setMinAmount(p.minAmount);
+      if (p.maxAmount) setMaxAmount(p.maxAmount);
+      if (p.minLag) setMinLag(p.minLag);
+      if (p.maxLag) setMaxLag(p.maxLag);
+      if (p.labelStatus) setLabelStatus(p.labelStatus);
+    }
+  }, []);
+
   // Debounce MP name search
   useEffect(() => {
+    if (!isMounted) return;
     const timer = setTimeout(() => {
       if (searchInput !== debouncedSearch) {
         setDebouncedSearch(searchInput);
@@ -109,11 +118,11 @@ function Dashboard() {
       }
     }, 300);
     return () => clearTimeout(timer);
-  }, [searchInput, debouncedSearch]);
+  }, [searchInput, debouncedSearch, isMounted]);
 
   // Sync to URL search params
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!isMounted || typeof window === "undefined") return;
     const sp = new URLSearchParams();
     if (method !== "gat") sp.set("method", method);
     if (page > 1) sp.set("page", String(page));
@@ -131,6 +140,7 @@ function Dashboard() {
     const targetUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
     window.history.replaceState(null, "", targetUrl);
   }, [
+    isMounted,
     method,
     page,
     debouncedSearch,
@@ -147,7 +157,8 @@ function Dashboard() {
   // Handle browser back/forward buttons
   useEffect(() => {
     const handlePopState = () => {
-      const p = getInitialParams();
+      const p = parseUrlParams();
+      if (!p) return;
       setMethod(p.method);
       setPage(p.page);
       setSearchInput(p.search);
