@@ -607,11 +607,11 @@ function mockEvaluation(): EvaluationResponse {
       },
     ],
     limitations: [
-      "Synthetic anomaly benchmark: Evaluations are performed against synthetically injected anomaly typologies (A-H), not verified real-world fraud convictions.",
-      "Analyst label selection bias: The 60 analyst review labels were collected from top-ranked GAT candidate lists rather than a random representative sample.",
-      "Relative triage ranking: Scores represent relative statistical anomaly rankings for review prioritisation, not calibrated posterior probabilities of misconduct.",
-      "Administrative confounding: Non-fraudulent operational practices (such as fiscal year-end sanction clustering or round-budget allotments) can trigger high scores.",
-      "Evasion generalization: Detectors trained or tuned on specified patterns may not detect novel or sophisticated evasion strategies.",
+      "No ground truth, and a 15,000-work sample: True misconduct ground truth does not exist in this 15,000-work sample; labels reflect offline triage inspection, not adjudicated findings.",
+      "Synthetic generator signatures: Benchmarks evaluate synthetically injected episodes; models may detect artifactual signatures of the generator rather than real-world corruption.",
+      "Typology F driven by host selection: Detection performance on Typology F is likely driven by host selection patterns rather than genuine anomaly detection.",
+      "Typologies G and H caught by no detector: Subtle distributed patterns (Typologies G and H) are caught by virtually no detector across low triage budgets, remaining near random chance.",
+      "Fusion disagreement with analyst labels: Learned fusion models were trained on synthetic fraud patterns and disagreed with offline analyst review labels (which were drawn from GAT-ranked lists).",
     ],
   };
 }

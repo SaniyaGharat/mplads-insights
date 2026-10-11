@@ -68,14 +68,18 @@ export function EvaluationTab() {
     const rows = data.review_budget_recall.filter((r) => r.Typology === selectedTypology);
 
     const budgetLevels = [
-      { key: "1%", label: "Top 1%", pctKey: "Recall_Top 1%" as const, strKey: "Recall_Str_Top 1%" as const },
-      { key: "2%", label: "Top 2%", pctKey: "Recall_Top 2%" as const, strKey: "Recall_Str_Top 2%" as const },
-      { key: "5%", label: "Top 5%", pctKey: "Recall_Top 5%" as const, strKey: "Recall_Str_Top 5%" as const },
-      { key: "10%", label: "Top 10%", pctKey: "Recall_Top 10%" as const, strKey: "Recall_Str_Top 10%" as const },
+      { key: "1%", label: "Top 1%", pctKey: "Recall_Top 1%" as const, strKey: "Recall_Str_Top 1%" as const, randomVal: 1.0 },
+      { key: "2%", label: "Top 2%", pctKey: "Recall_Top 2%" as const, strKey: "Recall_Str_Top 2%" as const, randomVal: 2.0 },
+      { key: "5%", label: "Top 5%", pctKey: "Recall_Top 5%" as const, strKey: "Recall_Str_Top 5%" as const, randomVal: 5.0 },
+      { key: "10%", label: "Top 10%", pctKey: "Recall_Top 10%" as const, strKey: "Recall_Str_Top 10%" as const, randomVal: 10.0 },
     ];
 
     return budgetLevels.map((lvl) => {
-      const point: Record<string, any> = { budget: lvl.label };
+      const point: Record<string, any> = {
+        budget: lvl.label,
+        "Random Baseline": lvl.randomVal,
+        "Random Baseline_str": `${lvl.randomVal.toFixed(1)}% (random draw)`,
+      };
       for (const row of rows) {
         const recallVal = (row[lvl.pctKey] || 0) * 100;
         point[row.Detector] = Number(recallVal.toFixed(2));
@@ -117,10 +121,10 @@ export function EvaluationTab() {
     <div className="space-y-6">
       {/* Overview Banner */}
       <div className="border border-border bg-card p-5">
-        <h2 className="text-lg font-semibold">Offline Benchmark Evaluation</h2>
+        <h2 className="text-lg font-semibold">Offline Benchmark Evaluation (Synthetic Injected Episodes)</h2>
         <p className="mt-1 text-xs text-muted-foreground">
-          Empirical evaluation results across synthetic anomaly injection benchmarks (Typologies A–H),
-          review budget recall curves, and statistical multi-model fusion experiments.
+          These are results on the synthetic benchmark, where the oracle is the injected episodes (Typologies A–H).
+          This is not ground truth misconduct. Scores evaluate detection of synthetic injection patterns under controlled budgets.
         </p>
       </div>
 
@@ -130,7 +134,7 @@ export function EvaluationTab() {
           <div>
             <h3 className="text-base font-semibold">Recall vs. Review Budget</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Proportion of injected anomalies identified within top 1%, 2%, 5%, and 10% triage review budgets.
+              Proportion of injected anomalies identified within top 1%, 2%, 5%, and 10% triage review budgets, compared against a Random Baseline.
             </p>
           </div>
           <div className="flex items-center gap-2">
@@ -199,6 +203,14 @@ export function EvaluationTab() {
                     activeDot={{ r: 6 }}
                   />
                 ))}
+                <Line
+                  type="monotone"
+                  dataKey="Random Baseline"
+                  stroke="#94a3b8"
+                  strokeDasharray="4 4"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                />
               </LineChart>
             </ResponsiveContainer>
           </div>
@@ -243,8 +255,38 @@ export function EvaluationTab() {
                     </td>
                   </tr>
                 ))}
+                {/* Random Baseline Row */}
+                <tr className="bg-secondary/20 font-medium text-muted-foreground">
+                  <td className="px-3 py-2 flex items-center gap-2">
+                    <span className="inline-block w-2.5 h-0.5 border-t-2 border-dashed border-slate-400" />
+                    Random Baseline (Expected)
+                  </td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums">1.00%</td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums">2.00%</td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums">5.00%</td>
+                  <td className="px-3 py-2 text-right font-mono tabular-nums">10.00%</td>
+                </tr>
               </tbody>
             </table>
+          </div>
+
+          {/* Honest Benchmark Observations Box */}
+          <div className="mt-4 rounded border border-border/80 bg-secondary/30 p-3 text-xs text-muted-foreground space-y-1.5">
+            <div className="font-semibold text-foreground flex items-center gap-1.5">
+              <span>💡</span> Benchmark Findings & Honest Interpretations:
+            </div>
+            <p>
+              • <strong>Random Baseline:</strong> Reviewing <em>B%</em> of works at random yields an expected <em>B%</em> recall (1% at 1%, 2% at 2%, 5% at 5%, 10% at 10%).
+            </p>
+            <p>
+              • <strong>Typology G Near Chance:</strong> Typology G is near chance across detectors (detectors struggle to separate subtle distributed coordination).
+            </p>
+            <p>
+              • <strong>1% Review Budget at ~0:</strong> At a tight 1% review budget, GAT and Isolation Forest achieve approximately 0% recall across multiple typologies.
+            </p>
+            <p>
+              • <strong>Synthetic Oracle:</strong> Injected episodes serve as the oracle for these recall figures; results do not represent adjudicated real-world fraud.
+            </p>
           </div>
         </div>
       </div>
@@ -426,6 +468,19 @@ export function EvaluationTab() {
               </table>
             </div>
           )}
+
+          {/* Baseline Selection & Hindsight Caveat */}
+          <div className="mt-4 rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200 space-y-1.5">
+            <div className="font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
+              <span>⚠️</span> Baseline Selection & Hindsight Caveat:
+            </div>
+            <p>
+              The tables present performance vs. both the <strong>train-selected baseline</strong> (Bag-of-Tokens / BoT) and the <strong>heterogeneous graph baseline</strong> (HIN).
+            </p>
+            <p>
+              Note that while models appear to "beat the baseline" on pooled train-selected benchmarks, this <strong>does not represent a hindsight baseline</strong>. Beating the train-selected baseline does not eliminate model selection bias or guarantee outperformance against hindsight optimal baseline choices.
+            </p>
+          </div>
         </div>
       </div>
 

@@ -134,6 +134,14 @@ export function ExplainPanel({
                               {meta.tag}
                             </span>
                           )}
+                          {mKey === "siamese" && (
+                            <span
+                              title="Siamese was trained on your 51 labels, so those works will appear flagged by construction."
+                              className="cursor-help rounded bg-secondary px-1 text-[9px] text-muted-foreground"
+                            >
+                              trained on 51 labels ℹ️
+                            </span>
+                          )}
                           {isCurrent && (
                             <span className="rounded bg-secondary px-1 text-[9px] text-muted-foreground">
                               active
@@ -167,6 +175,14 @@ export function ExplainPanel({
                 })}
               </tbody>
             </table>
+            <div className="mt-2.5 rounded bg-secondary/30 p-2 text-[11px] text-muted-foreground space-y-1 border border-border/50">
+              <p>
+                • <strong>Method Disagreement:</strong> A work flagged by one method and "Not flagged" by another is the expected finding due to differing model inductive biases, not a bug.
+              </p>
+              <p>
+                • <strong>Siamese Flags:</strong> Siamese was trained on your 51 labels, so those works will appear flagged by construction.
+              </p>
+            </div>
           </div>
         ) : (
           <p className="mt-3 text-xs text-muted-foreground italic">
