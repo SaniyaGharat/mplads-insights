@@ -110,7 +110,7 @@ export function ExplainPanel({
                 isDemo && "opacity-50 cursor-not-allowed hover:bg-alert/10",
               )}
             >
-              Mark Suspicious
+              Flag for Review
             </button>
             <button
               disabled={isDemo}

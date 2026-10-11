@@ -126,25 +126,25 @@ export const DEFAULT_METHODS: MethodInfo[] = [
     id: "gat",
     name: "Graph Attention Network (GAT)",
     direction: "higher_is_riskier",
-    note: "Reconstruction error; favours statistically rare works",
+    note: "Reconstruction error: flags statistically unusual works. Favours rare values; not evidence of misconduct.",
   },
   {
     id: "siamese",
     name: "Siamese Network",
     direction: "lower_is_riskier",
-    note: "Distance to suspicious centroid; trained on 51 usable analyst labels (biased sample)",
+    note: "Similarity to 51 analyst-labelled works (drawn from GAT-ranked lists, so biased).",
   },
   {
     id: "community",
     name: "Community Anomaly Scorer",
     direction: "higher_is_riskier",
-    note: "30-day, multi-MP co-occurrence at one agency, scored by amount similarity; capped at 1000; round-sum coincidences are common",
+    note: "Several MPs sanctioning similar amounts at one agency within 30 days. Round-sum coincidences are common.",
   },
   {
     id: "fusion",
     name: "Learned Fusion",
     direction: "higher_is_riskier",
-    note: "Triage score from a model trained on synthetic fraud typologies; not validated on real fraud labels; rank-ordering score, not a probability; disagreed with analyst labels (see report)",
+    note: "Experimental. Trained on synthetic fraud patterns, not validated on real fraud labels. A rank-ordering score, not a probability. It disagreed with analyst labels (see report).",
   },
 ];
 

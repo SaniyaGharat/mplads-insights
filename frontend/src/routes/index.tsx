@@ -23,7 +23,7 @@ import { StatsOverview } from "@/components/mplads/StatsOverview";
 import { ExplainPanel } from "@/components/mplads/ExplainPanel";
 import { NetworkGraph } from "@/components/mplads/NetworkGraph";
 
-const TITLE = "MPLADS Fraud & Anomaly Detection";
+const TITLE = "MPLADS Anomaly Detection";
 const DESCRIPTION =
   "Review AI-flagged anomalies in MPLADS fund sanctioning data: risk-ranked works, neighbour attribution, network view and analyst labelling.";
 
@@ -123,7 +123,7 @@ function Dashboard() {
           status: "success",
           message:
             variables.value === "s"
-              ? "Marked Suspicious"
+              ? "Flagged for review"
               : variables.value === "n"
               ? "Marked Normal"
               : "Skipped",
@@ -192,7 +192,7 @@ function Dashboard() {
             <dl className="flex gap-6 border border-border bg-secondary/60 px-5 py-3 text-center">
               {(
                 [
-                  ["Suspicious", totals.s, "text-alert"],
+                  ["Flagged for review", totals.s, "text-alert"],
                   ["Normal", totals.n, "text-ok"],
                   ["Skipped", totals.skip, "text-muted-foreground"],
                 ] as const
@@ -323,6 +323,11 @@ function Dashboard() {
               </div>
             )}
 
+            {/* Disclaimer Banner */}
+            <div className="border-b border-border bg-secondary/30 px-5 py-2 text-xs text-muted-foreground">
+              Scores are for audit prioritisation only and are based on model output.
+            </div>
+
             {scores.isLoading ? (
               <p className="px-5 py-12 text-sm text-muted-foreground">Loading triage scores…</p>
             ) : (
@@ -334,6 +339,7 @@ function Dashboard() {
                 isLoading={scores.isFetching}
                 isDemo={isAnyMock}
                 labellingEnabled={labellingEnabled}
+                method={method}
                 direction={currentMethod?.direction}
                 rowFeedback={rowFeedback}
                 onSelect={setSelected}
@@ -408,7 +414,7 @@ function Dashboard() {
       </div>
 
       <footer className="border-t border-border bg-card py-5 text-center text-xs text-muted-foreground">
-        Flags are leads for review, not confirmed fraud.
+        Flags are leads for review, not proof of misconduct.
       </footer>
     </div>
   );

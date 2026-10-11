@@ -77,10 +77,10 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "MPLADS Fraud & Anomaly Detection" },
+      { title: "MPLADS Anomaly Detection" },
       { name: "description", content: "Analyst console for AI-flagged anomalies in MPLADS fund sanctioning data." },
       { name: "author", content: "Lovable" },
-      { property: "og:title", content: "MPLADS Fraud & Anomaly Detection" },
+      { property: "og:title", content: "MPLADS Anomaly Detection" },
       { property: "og:description", content: "Analyst console for AI-flagged anomalies in MPLADS fund sanctioning data." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

@@ -40,7 +40,7 @@ class GATEncoder(torch.nn.Module):
             return x
 
 # --- Backend App ---
-app = FastAPI(title="MPLADS Fraud Detection Backend")
+app = FastAPI(title="MPLADS Anomaly Detection Backend")
 
 from fastapi.middleware.cors import CORSMiddleware
 
@@ -247,25 +247,25 @@ async def get_methods():
                 "id": "gat",
                 "name": "Graph Attention Network (GAT)",
                 "direction": "higher_is_riskier",
-                "note": "Reconstruction error; favours statistically rare works"
+                "note": "Reconstruction error: flags statistically unusual works. Favours rare values; not evidence of misconduct."
             },
             {
                 "id": "siamese",
                 "name": "Siamese Network",
                 "direction": "lower_is_riskier",
-                "note": "Distance to suspicious centroid; trained on 51 usable analyst labels (biased sample)"
+                "note": "Similarity to 51 analyst-labelled works (drawn from GAT-ranked lists, so biased)."
             },
             {
                 "id": "community",
                 "name": "Community Anomaly Scorer",
                 "direction": "higher_is_riskier",
-                "note": "30-day, multi-MP co-occurrence at one agency, scored by amount similarity; capped at 1000; round-sum coincidences are common"
+                "note": "Several MPs sanctioning similar amounts at one agency within 30 days. Round-sum coincidences are common."
             },
             {
                 "id": "fusion",
                 "name": "Learned Fusion",
                 "direction": "higher_is_riskier",
-                "note": "Triage score from a model trained on synthetic fraud typologies; not validated on real fraud labels; rank-ordering score, not a probability; disagreed with analyst labels (see report)"
+                "note": "Experimental. Trained on synthetic fraud patterns, not validated on real fraud labels. A rank-ordering score, not a probability. It disagreed with analyst labels (see report)."
             }
         ]
     }
@@ -279,19 +279,19 @@ async def get_risk_scores(method: str = "gat", page: int = 1, page_size: int = 5
     if method_lower == "gat":
         scores = DATA['gat_scores']
         sorted_indices = np.argsort(-scores)
-        method_note = "Reconstruction error; favours statistically rare works"
+        method_note = "Reconstruction error: flags statistically unusual works. Favours rare values; not evidence of misconduct."
     elif method_lower == "siamese":
         scores = DATA['siamese_scores']
         sorted_indices = np.argsort(scores)
-        method_note = "Distance to suspicious centroid; trained on 51 usable analyst labels (biased sample)"
+        method_note = "Similarity to 51 analyst-labelled works (drawn from GAT-ranked lists, so biased)."
     elif method_lower == "community":
         scores = DATA['community_scores']
         sorted_indices = np.argsort(-scores)
-        method_note = "30-day, multi-MP co-occurrence at one agency, scored by amount similarity; capped at 1000; round-sum coincidences are common"
+        method_note = "Several MPs sanctioning similar amounts at one agency within 30 days. Round-sum coincidences are common."
     elif method_lower == "fusion":
         scores = DATA['fusion_scores']
         sorted_indices = np.argsort(-scores)
-        method_note = "Triage score from a model trained on synthetic fraud typologies; not validated on real fraud labels; rank-ordering score, not a probability; disagreed with analyst labels (see report)"
+        method_note = "Experimental. Trained on synthetic fraud patterns, not validated on real fraud labels. A rank-ordering score, not a probability. It disagreed with analyst labels (see report)."
     else:
         raise HTTPException(
             status_code=400,
@@ -339,7 +339,7 @@ async def get_risk_scores(method: str = "gat", page: int = 1, page_size: int = 5
 
 @app.get("/api/graph")
 async def get_graph(top_n: int = 50):
-    # Return nodes and edges for top N suspicious works
+    # Return nodes and edges for top N flagged works
     scores = DATA['gat_scores']
     top_indices = np.argsort(scores)[-top_n:][::-1]
 
