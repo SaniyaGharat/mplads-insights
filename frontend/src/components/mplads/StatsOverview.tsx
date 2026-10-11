@@ -86,6 +86,28 @@ function Kpi({
   );
 }
 
+function TruncatedMpTick({
+  x,
+  y,
+  payload,
+}: {
+  x?: number;
+  y?: number;
+  payload?: { value: string };
+}) {
+  const value = payload?.value ?? "";
+  const maxLen = 22;
+  const display = value.length > maxLen ? `${value.slice(0, maxLen - 1)}…` : value;
+  return (
+    <g transform={`translate(${x ?? 0},${y ?? 0})`}>
+      <text x={-6} y={4} textAnchor="end" fill={AXIS} fontSize={11}>
+        <title>{value}</title>
+        {display}
+      </text>
+    </g>
+  );
+}
+
 export function StatsOverview({ stats, isLoading, isMock, error, flaggedCount }: Props) {
   if (isLoading || !stats) {
     return (
@@ -192,12 +214,22 @@ export function StatsOverview({ stats, isLoading, isMock, error, flaggedCount }:
           </p>
         </ChartCard>
 
-        <ChartCard title="Top 10 highest-risk MPs" subtitle="Ranked by flagged work count">
+        <ChartCard
+          title="Top 10 MPs (reviewed or top-scored works)"
+          subtitle="Covers reviewed or top-scored works (includes works labelled normal)"
+        >
           <ResponsiveContainer width="100%" height={340}>
-            <BarChart data={topMps} layout="vertical" margin={{ left: 8 }}>
+            <BarChart data={topMps} layout="vertical" margin={{ left: 16, right: 16 }}>
               <CartesianGrid stroke={GRID} horizontal={false} />
               <XAxis type="number" {...axisProps} />
-              <YAxis type="category" dataKey="MP" width={150} {...axisProps} />
+              <YAxis
+                type="category"
+                dataKey="MP"
+                width={170}
+                stroke={GRID}
+                tickLine={false}
+                tick={<TruncatedMpTick />}
+              />
               <Tooltip
                 {...tooltipStyle()}
                 cursor={{ fill: "oklch(0.6 0.05 155 / 0.08)" }}
@@ -212,8 +244,8 @@ export function StatsOverview({ stats, isLoading, isMock, error, flaggedCount }:
         </ChartCard>
 
         <ChartCard
-          title="Avg sanction lag: flagged vs normal works"
-          subtitle="Days between sanction and recorded progress"
+          title="Avg sanction lag: reviewed or top-scored vs normal works"
+          subtitle="Covers reviewed or top-scored works (includes works labelled normal)"
         >
           <ResponsiveContainer width="100%" height={340}>
             <BarChart data={lagData}>

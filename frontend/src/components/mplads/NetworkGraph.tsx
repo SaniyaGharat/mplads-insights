@@ -10,8 +10,12 @@ interface Props {
   onSelectEdge: (workIndex: number) => void;
 }
 
-const W = 900;
+const W = 960;
 const H = 460;
+
+function truncateLabel(text: string, maxLen = 26): string {
+  return text.length > maxLen ? `${text.slice(0, maxLen - 1)}…` : text;
+}
 
 export function NetworkGraph({
   graph,
@@ -30,8 +34,8 @@ export function NetworkGraph({
       const step = (H - 60) / Math.max(1, ids.length);
       ids.forEach((n, i) => pos.set(n.id, { x, y: 40 + step * (i + 0.5) }));
     };
-    place(mps, 190);
-    place(idas, W - 190);
+    place(mps, 210);
+    place(idas, W - 210);
     return { pos, mps, idas };
   }, [graph]);
 
@@ -107,14 +111,17 @@ export function NetworkGraph({
             const p = layout.pos.get(n.id)!;
             return (
               <g key={n.id}>
-                <circle cx={p.x} cy={p.y} r={6} className="fill-navy" />
+                <circle cx={p.x} cy={p.y} r={6} className="fill-navy">
+                  <title>{n.id}</title>
+                </circle>
                 <text
                   x={p.x - 12}
                   y={p.y + 4}
                   textAnchor="end"
                   className="fill-foreground text-[11px]"
                 >
-                  {n.id}
+                  <title>{n.id}</title>
+                  {truncateLabel(n.id, 26)}
                 </text>
               </g>
             );
@@ -123,9 +130,12 @@ export function NetworkGraph({
             const p = layout.pos.get(n.id)!;
             return (
               <g key={n.id}>
-                <rect x={p.x - 5} y={p.y - 5} width={10} height={10} className="fill-sage" />
+                <rect x={p.x - 5} y={p.y - 5} width={10} height={10} className="fill-sage">
+                  <title>{n.id}</title>
+                </rect>
                 <text x={p.x + 14} y={p.y + 4} className="fill-foreground text-[11px]">
-                  {n.id}
+                  <title>{n.id}</title>
+                  {truncateLabel(n.id, 26)}
                 </text>
               </g>
             );

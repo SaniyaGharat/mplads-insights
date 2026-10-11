@@ -47,7 +47,7 @@ export function ExplainPanel({ row, method = "gat", explain, isLoading, isMock, 
       {method === "gat" ? (
         <div className="px-5 py-4">
           <h3 className="text-[11px] tracking-wider text-muted-foreground uppercase">
-            Top 3 influencing neighbours
+            Top 3 attention edges (neighbours may repeat)
           </h3>
           {isLoading && <p className="mt-3 text-sm text-muted-foreground">Loading attribution…</p>}
           {!isLoading && explain && (
