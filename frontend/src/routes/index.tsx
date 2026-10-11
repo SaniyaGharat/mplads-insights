@@ -1,8 +1,9 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useQuery, useMutation, keepPreviousData } from "@tanstack/react-query";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import {
   fetchExplain,
+  fetchFilterOptions,
   fetchGraph,
   fetchHealth,
   fetchMethods,
@@ -15,6 +16,7 @@ import {
   type LabelValue,
   type RiskRow,
   type ScoringMethod,
+  type RiskScoresFilterParams,
 } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/config";
 import { cn } from "@/lib/utils";
@@ -43,14 +45,131 @@ export const Route = createFileRoute("/")({
 
 const PAGE_SIZE = 50;
 
+function getInitialParams() {
+  if (typeof window === "undefined") {
+    return {
+      method: "gat" as ScoringMethod,
+      page: 1,
+      search: "",
+      state: "",
+      district: "",
+      status: "",
+      minAmount: "",
+      maxAmount: "",
+      minLag: "",
+      maxLag: "",
+      labelStatus: "",
+    };
+  }
+  const sp = new URLSearchParams(window.location.search);
+  const m = sp.get("method")?.toLowerCase();
+  const validMethods: ScoringMethod[] = ["gat", "siamese", "community", "fusion"];
+  return {
+    method: validMethods.includes(m as ScoringMethod) ? (m as ScoringMethod) : ("gat" as ScoringMethod),
+    page: Math.max(1, parseInt(sp.get("page") || "1", 10) || 1),
+    search: sp.get("search") || "",
+    state: sp.get("state") || "",
+    district: sp.get("district") || "",
+    status: sp.get("status") || "",
+    minAmount: sp.get("min_amount") || "",
+    maxAmount: sp.get("max_amount") || "",
+    minLag: sp.get("min_lag") || "",
+    maxLag: sp.get("max_lag") || "",
+    labelStatus: sp.get("label_status") || "",
+  };
+}
+
 function Dashboard() {
-  const [method, setMethod] = useState<ScoringMethod>("gat");
-  const [page, setPage] = useState(1);
+  const initial = useMemo(() => getInitialParams(), []);
+  const [method, setMethod] = useState<ScoringMethod>(initial.method);
+  const [page, setPage] = useState<number>(initial.page);
+  const [searchInput, setSearchInput] = useState<string>(initial.search);
+  const [debouncedSearch, setDebouncedSearch] = useState<string>(initial.search);
+  const [selectedState, setSelectedState] = useState<string>(initial.state);
+  const [selectedDistrict, setSelectedDistrict] = useState<string>(initial.district);
+  const [selectedStatus, setSelectedStatus] = useState<string>(initial.status);
+  const [minAmount, setMinAmount] = useState<string>(initial.minAmount);
+  const [maxAmount, setMaxAmount] = useState<string>(initial.maxAmount);
+  const [minLag, setMinLag] = useState<string>(initial.minLag);
+  const [maxLag, setMaxLag] = useState<string>(initial.maxLag);
+  const [labelStatus, setLabelStatus] = useState<string>(initial.labelStatus);
+
   const [selected, setSelected] = useState<RiskRow | null>(null);
   const [totals, setTotals] = useState<LabelTotals>({ s: 0, n: 0, skip: 0 });
   const [rowFeedback, setRowFeedback] = useState<
     Record<number, { status: "success" | "duplicate" | "error"; message: string }>
   >({});
+
+  // Debounce MP name search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchInput !== debouncedSearch) {
+        setDebouncedSearch(searchInput);
+        setPage(1);
+      }
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [searchInput, debouncedSearch]);
+
+  // Sync to URL search params
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const sp = new URLSearchParams();
+    if (method !== "gat") sp.set("method", method);
+    if (page > 1) sp.set("page", String(page));
+    if (debouncedSearch.trim()) sp.set("search", debouncedSearch.trim());
+    if (selectedState.trim()) sp.set("state", selectedState.trim());
+    if (selectedDistrict.trim()) sp.set("district", selectedDistrict.trim());
+    if (selectedStatus.trim()) sp.set("status", selectedStatus.trim());
+    if (minAmount.trim()) sp.set("min_amount", minAmount.trim());
+    if (maxAmount.trim()) sp.set("max_amount", maxAmount.trim());
+    if (minLag.trim()) sp.set("min_lag", minLag.trim());
+    if (maxLag.trim()) sp.set("max_lag", maxLag.trim());
+    if (labelStatus.trim()) sp.set("label_status", labelStatus.trim());
+
+    const qs = sp.toString();
+    const targetUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
+    window.history.replaceState(null, "", targetUrl);
+  }, [
+    method,
+    page,
+    debouncedSearch,
+    selectedState,
+    selectedDistrict,
+    selectedStatus,
+    minAmount,
+    maxAmount,
+    minLag,
+    maxLag,
+    labelStatus,
+  ]);
+
+  // Handle browser back/forward buttons
+  useEffect(() => {
+    const handlePopState = () => {
+      const p = getInitialParams();
+      setMethod(p.method);
+      setPage(p.page);
+      setSearchInput(p.search);
+      setDebouncedSearch(p.search);
+      setSelectedState(p.state);
+      setSelectedDistrict(p.district);
+      setSelectedStatus(p.status);
+      setMinAmount(p.minAmount);
+      setMaxAmount(p.maxAmount);
+      setMinLag(p.minLag);
+      setMaxLag(p.maxLag);
+      setLabelStatus(p.labelStatus);
+    };
+    window.addEventListener("popstate", handlePopState);
+    return () => window.removeEventListener("popstate", handlePopState);
+  }, []);
+
+  const filterOptionsQuery = useQuery({
+    queryKey: ["filter-options"],
+    queryFn: fetchFilterOptions,
+  });
+  const filterOptions = filterOptionsQuery.data?.data;
 
   const labelTotals = useQuery({
     queryKey: ["label-totals"],
@@ -72,9 +191,47 @@ function Dashboard() {
   const currentMethod =
     methodList.find((m) => m.id === method) ?? DEFAULT_METHODS.find((m) => m.id === method);
 
+  const activeFilters: RiskScoresFilterParams = useMemo(
+    () => ({
+      search: debouncedSearch,
+      state: selectedState,
+      district: selectedDistrict,
+      status: selectedStatus,
+      min_amount: minAmount,
+      max_amount: maxAmount,
+      min_lag: minLag,
+      max_lag: maxLag,
+      label_status: labelStatus,
+    }),
+    [
+      debouncedSearch,
+      selectedState,
+      selectedDistrict,
+      selectedStatus,
+      minAmount,
+      maxAmount,
+      minLag,
+      maxLag,
+      labelStatus,
+    ],
+  );
+
   const scores = useQuery({
-    queryKey: ["risk-scores", method, page],
-    queryFn: () => fetchRiskScores(method, page, PAGE_SIZE),
+    queryKey: [
+      "risk-scores",
+      method,
+      page,
+      debouncedSearch,
+      selectedState,
+      selectedDistrict,
+      selectedStatus,
+      minAmount,
+      maxAmount,
+      minLag,
+      maxLag,
+      labelStatus,
+    ],
+    queryFn: () => fetchRiskScores(method, page, PAGE_SIZE, activeFilters),
     placeholderData: keepPreviousData,
   });
 
@@ -169,6 +326,32 @@ function Dashboard() {
     label.mutate({ workIndex, value });
   };
 
+  const hasActiveFilters = Boolean(
+    searchInput.trim() ||
+      selectedState ||
+      selectedDistrict ||
+      selectedStatus ||
+      minAmount ||
+      maxAmount ||
+      minLag ||
+      maxLag ||
+      labelStatus,
+  );
+
+  const clearFilters = () => {
+    setSearchInput("");
+    setDebouncedSearch("");
+    setSelectedState("");
+    setSelectedDistrict("");
+    setSelectedStatus("");
+    setMinAmount("");
+    setMaxAmount("");
+    setMinLag("");
+    setMaxLag("");
+    setLabelStatus("");
+    setPage(1);
+  };
+
   return (
     <div className="min-h-screen bg-background flex flex-col justify-between">
       <div>
@@ -222,7 +405,7 @@ function Dashboard() {
               <div>
                 <h2 className="text-base font-semibold">Risk-ranked sanctioned works</h2>
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {total.toLocaleString("en-IN")} records · page {page} of{" "}
+                  Showing {total.toLocaleString("en-IN")} of 15,000 · page {page} of{" "}
                   {pageCount.toLocaleString("en-IN")}
                 </p>
                 {!labellingEnabled && (
@@ -328,6 +511,219 @@ function Dashboard() {
               Scores are for audit prioritisation only and are based on model output.
             </div>
 
+            {/* Filter Controls Bar */}
+            <div className="border-b border-border bg-card px-5 py-3 space-y-3">
+              <div className="flex flex-wrap items-end gap-3">
+                {/* Search */}
+                <div className="flex-1 min-w-[200px]">
+                  <label
+                    htmlFor="filter-search"
+                    className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
+                  >
+                    MP Search
+                  </label>
+                  <input
+                    id="filter-search"
+                    type="text"
+                    value={searchInput}
+                    onChange={(e) => setSearchInput(e.target.value)}
+                    placeholder="Search MP name..."
+                    className="w-full border border-border bg-background px-2.5 py-1.5 text-xs text-foreground placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
+                  />
+                </div>
+
+                {/* State */}
+                <div className="w-[170px]">
+                  <label
+                    htmlFor="filter-state"
+                    className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
+                  >
+                    State
+                  </label>
+                  <select
+                    id="filter-state"
+                    value={selectedState}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setSelectedState(val);
+                      setSelectedDistrict("");
+                      setPage(1);
+                    }}
+                    className="w-full border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">All States</option>
+                    {(filterOptions?.states ?? []).map((s) => (
+                      <option key={s} value={s}>
+                        {s}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* District (depends on State) */}
+                <div className="w-[170px]">
+                  <label
+                    htmlFor="filter-district"
+                    className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
+                  >
+                    District
+                  </label>
+                  <select
+                    id="filter-district"
+                    value={selectedDistrict}
+                    disabled={!selectedState}
+                    onChange={(e) => {
+                      setSelectedDistrict(e.target.value);
+                      setPage(1);
+                    }}
+                    className="w-full border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    <option value="">
+                      {selectedState ? "All Districts" : "Select a State first"}
+                    </option>
+                    {selectedState &&
+                      (filterOptions?.districts_by_state?.[selectedState] ?? []).map((d) => (
+                        <option key={d} value={d}>
+                          {d}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {/* Status */}
+                <div className="w-[160px]">
+                  <label
+                    htmlFor="filter-status"
+                    className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
+                  >
+                    Status
+                  </label>
+                  <select
+                    id="filter-status"
+                    value={selectedStatus}
+                    onChange={(e) => {
+                      setSelectedStatus(e.target.value);
+                      setPage(1);
+                    }}
+                    className="w-full border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">All Statuses</option>
+                    {(filterOptions?.statuses ?? []).map((st) => (
+                      <option key={st} value={st}>
+                        {st}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Label Status */}
+                <div className="w-[140px]">
+                  <label
+                    htmlFor="filter-label-status"
+                    className="block text-[10px] font-medium uppercase tracking-wider text-muted-foreground mb-1"
+                  >
+                    Label Status
+                  </label>
+                  <select
+                    id="filter-label-status"
+                    value={labelStatus}
+                    onChange={(e) => {
+                      setLabelStatus(e.target.value);
+                      setPage(1);
+                    }}
+                    className="w-full border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
+                  >
+                    <option value="">All Labels</option>
+                    <option value="TRAINING LABEL">Training Label</option>
+                    <option value="GAT-TOP">GAT-Top</option>
+                    <option value="NEW">New</option>
+                  </select>
+                </div>
+              </div>
+
+              {/* Second Row: Amount and Lag ranges + Clear Filters + Showing X of 15,000 */}
+              <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-border/50 text-xs">
+                <div className="flex flex-wrap items-center gap-4">
+                  {/* Amount Range */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Amount (₹):
+                    </span>
+                    <input
+                      type="number"
+                      placeholder="Min ₹"
+                      value={minAmount}
+                      onChange={(e) => {
+                        setMinAmount(e.target.value);
+                        setPage(1);
+                      }}
+                      className="w-24 border border-border bg-background px-2 py-1 text-xs text-foreground font-mono placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                    <span className="text-muted-foreground">–</span>
+                    <input
+                      type="number"
+                      placeholder="Max ₹"
+                      value={maxAmount}
+                      onChange={(e) => {
+                        setMaxAmount(e.target.value);
+                        setPage(1);
+                      }}
+                      className="w-24 border border-border bg-background px-2 py-1 text-xs text-foreground font-mono placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  {/* Lag Range */}
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                      Lag (days):
+                    </span>
+                    <input
+                      type="number"
+                      placeholder="Min"
+                      value={minLag}
+                      onChange={(e) => {
+                        setMinLag(e.target.value);
+                        setPage(1);
+                      }}
+                      className="w-16 border border-border bg-background px-2 py-1 text-xs text-foreground font-mono placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                    <span className="text-muted-foreground">–</span>
+                    <input
+                      type="number"
+                      placeholder="Max"
+                      value={maxLag}
+                      onChange={(e) => {
+                        setMaxLag(e.target.value);
+                        setPage(1);
+                      }}
+                      className="w-16 border border-border bg-background px-2 py-1 text-xs text-foreground font-mono placeholder:text-muted-foreground/60 focus:outline-none focus:ring-1 focus:ring-ring"
+                    />
+                  </div>
+
+                  {/* Clear filters button */}
+                  <button
+                    onClick={clearFilters}
+                    disabled={!hasActiveFilters}
+                    className={cn(
+                      "border border-border px-2.5 py-1 text-xs font-medium transition-colors cursor-pointer",
+                      hasActiveFilters
+                        ? "text-foreground hover:bg-muted"
+                        : "opacity-40 cursor-not-allowed text-muted-foreground",
+                    )}
+                  >
+                    Clear filters
+                  </button>
+                </div>
+
+                {/* Showing X of 15,000 */}
+                <div className="flex items-center gap-2">
+                  <span className="border border-border bg-secondary/60 px-2.5 py-1 text-xs font-medium text-foreground tabular-nums">
+                    Showing {total.toLocaleString("en-IN")} of 15,000
+                  </span>
+                </div>
+              </div>
+            </div>
+
             {scores.isLoading ? (
               <p className="px-5 py-12 text-sm text-muted-foreground">Loading triage scores…</p>
             ) : (
@@ -349,7 +745,9 @@ function Dashboard() {
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-5 py-3 text-xs">
               <span className="text-muted-foreground">
-                Rows {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, total)}
+                {total === 0
+                  ? "No matching records"
+                  : `Rows ${(page - 1) * PAGE_SIZE + 1}–${Math.min(page * PAGE_SIZE, total)}`}
               </span>
               <div className="flex items-center gap-2">
                 <PagerButton disabled={page === 1} onClick={() => setPage(1)} label="First" />

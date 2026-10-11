@@ -67,12 +67,19 @@ async def health_check():
 # Global state
 DATA = {}
 
+def _prepare_df_works(df: pd.DataFrame):
+    if '_district' not in df.columns:
+        df['_district'] = df['IDA'].apply(lambda x: str(x).split('(')[0].strip())
+    if '_norm_mp' not in df.columns:
+        df['_norm_mp'] = df['MP'].apply(lambda x: ' '.join(str(x).replace('(2024-2029)', '').split()).lower())
+
 @app.on_event("startup")
 async def startup_event():
     print("Loading artifacts...")
     print("Labels CSV absolute path:", os.path.abspath('ml/anomaly_labels.csv'))
     # 1. Load Base Data
     df_works = pd.read_csv('data/works_sanctioned_clean.csv')
+    _prepare_df_works(df_works)
     labels_df = pd.read_csv('ml/anomaly_labels.csv')
     gat_scores = np.load('ml/gat_scores.npy')
     all_embeddings = np.load('ml/gat_embeddings.npy')
@@ -271,8 +278,56 @@ async def get_methods():
     }
 
 
+@app.get("/api/filter-options")
+async def get_filter_options():
+    df_works = DATA.get('df_works')
+    if df_works is None:
+        raise HTTPException(status_code=503, detail="Backend data not loaded")
+    _prepare_df_works(df_works)
+
+    states = sorted(df_works['State'].dropna().unique().tolist())
+    districts_by_state = {}
+    for st, group in df_works.groupby('State'):
+        districts_by_state[st] = sorted(group['_district'].dropna().unique().tolist())
+    districts = sorted(df_works['_district'].dropna().unique().tolist())
+    statuses = sorted(df_works['Work Status'].dropna().unique().tolist())
+
+    amount_min = float(df_works['sanction_amount'].min())
+    amount_max = float(df_works['sanction_amount'].max())
+    lag_min = int(df_works['sanction_lag_days'].min())
+    lag_max = int(df_works['sanction_lag_days'].max())
+
+    return {
+        "states": states,
+        "districts_by_state": districts_by_state,
+        "districts": districts,
+        "statuses": statuses,
+        "amount_min": amount_min,
+        "amount_max": amount_max,
+        "lag_min": lag_min,
+        "lag_max": lag_max,
+        "min_amount": amount_min,
+        "max_amount": amount_max,
+        "min_lag": lag_min,
+        "max_lag": lag_max,
+    }
+
+
 @app.get("/api/risk-scores")
-async def get_risk_scores(method: str = "gat", page: int = 1, page_size: int = 50):
+async def get_risk_scores(
+    method: str = "gat",
+    page: int = 1,
+    page_size: int = 50,
+    search: Optional[str] = None,
+    state: Optional[str] = None,
+    district: Optional[str] = None,
+    status: Optional[str] = None,
+    min_amount: Optional[float] = None,
+    max_amount: Optional[float] = None,
+    min_lag: Optional[int] = None,
+    max_lag: Optional[int] = None,
+    label_status: Optional[str] = None,
+):
     method_lower = method.lower()
     method_note = ""
 
@@ -298,26 +353,82 @@ async def get_risk_scores(method: str = "gat", page: int = 1, page_size: int = 5
             detail=f"Unknown method '{method}'. Available methods: gat, siamese, community, fusion"
         )
 
-    # Paginate
-    start = (page - 1) * page_size
-    end = start + page_size
-    page_indices = sorted_indices[start:end]
+    df_works = DATA['df_works']
+    _prepare_df_works(df_works)
+
+    # 1-based global rank for chosen method across all works
+    global_ranks = np.empty(len(scores), dtype=int)
+    global_ranks[sorted_indices] = np.arange(1, len(scores) + 1)
 
     # Labels logic
     labeled_indices = set(DATA['labels_df']['work_index'].tolist())
     gat_top_15 = set(np.argsort(DATA['gat_scores'])[-15:])
 
+    # Filtering mask
+    mask = np.ones(len(df_works), dtype=bool)
+
+    if search is not None and search.strip():
+        clean_search = search.replace('(2024-2029)', '')
+        q = ' '.join(clean_search.strip().lower().split())
+        mask &= df_works['_norm_mp'].str.contains(q, regex=False)
+
+    if state is not None and state.strip():
+        mask &= (df_works['State'] == state.strip())
+
+    if district is not None and district.strip():
+        mask &= (df_works['_district'] == district.strip())
+
+    if status is not None and status.strip():
+        mask &= (df_works['Work Status'] == status.strip())
+
+    if min_amount is not None:
+        mask &= (df_works['sanction_amount'] >= float(min_amount))
+
+    if max_amount is not None:
+        mask &= (df_works['sanction_amount'] <= float(max_amount))
+
+    if min_lag is not None:
+        mask &= (df_works['sanction_lag_days'] >= int(min_lag))
+
+    if max_lag is not None:
+        mask &= (df_works['sanction_lag_days'] <= int(max_lag))
+
+    if label_status is not None and label_status.strip():
+        norm_target = label_status.strip().upper().replace('_', ' ')
+        if norm_target not in ("ALL", ""):
+            if norm_target in ("TRAINING LABEL", "TRAINING_LABEL"):
+                lbl_mask = np.zeros(len(df_works), dtype=bool)
+                lbl_mask[list(labeled_indices)] = True
+                mask &= lbl_mask
+            elif norm_target in ("GAT-TOP", "GAT_TOP"):
+                lbl_mask = np.zeros(len(df_works), dtype=bool)
+                lbl_mask[list(gat_top_15 - labeled_indices)] = True
+                mask &= lbl_mask
+            elif norm_target == "NEW":
+                lbl_mask = np.ones(len(df_works), dtype=bool)
+                lbl_mask[list(labeled_indices | gat_top_15)] = False
+                mask &= lbl_mask
+
+    filtered_indices = sorted_indices[mask[sorted_indices]]
+    total = int(len(filtered_indices))
+
+    # Paginate
+    start = (page - 1) * page_size
+    end = start + page_size
+    page_indices = filtered_indices[start:end]
+
     results = []
     for idx in page_indices:
-        if idx >= len(DATA['df_works']): continue
-        row = DATA['df_works'].iloc[idx]
+        if idx >= len(df_works): continue
+        row = df_works.iloc[idx]
 
-        status = "NEW"
-        if idx in labeled_indices: status = "TRAINING LABEL"
-        elif idx in gat_top_15: status = "GAT-TOP"
+        row_status = "NEW"
+        if idx in labeled_indices: row_status = "TRAINING LABEL"
+        elif idx in gat_top_15: row_status = "GAT-TOP"
 
         results.append({
             "work_index": int(idx),
+            "global_rank": int(global_ranks[idx]),
             "MP": row['MP'],
             "IDA": row['IDA'],
             "amount": float(row['sanction_amount']),
@@ -325,14 +436,14 @@ async def get_risk_scores(method: str = "gat", page: int = 1, page_size: int = 5
             "status": row['Work Status'],
             "category": row['Work category'],
             "score": float(scores[idx]),
-            "label_status": status
+            "label_status": row_status
         })
 
     return {
         "data": results,
         "page": page,
         "page_size": page_size,
-        "total": len(scores),
+        "total": total,
         "method": method_lower,
         "method_note": method_note
     }

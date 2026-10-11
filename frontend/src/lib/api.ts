@@ -16,6 +16,7 @@ export interface MethodsResponse {
 
 export interface RiskRow {
   work_index: number;
+  global_rank?: number;
   MP: string;
   IDA: string;
   amount: number;
@@ -24,6 +25,29 @@ export interface RiskRow {
   category: string;
   score: number;
   label_status: LabelStatus;
+}
+
+export interface RiskScoresFilterParams {
+  search?: string;
+  state?: string;
+  district?: string;
+  status?: string;
+  min_amount?: number | string;
+  max_amount?: number | string;
+  min_lag?: number | string;
+  max_lag?: number | string;
+  label_status?: string;
+}
+
+export interface FilterOptionsResponse {
+  states: string[];
+  districts_by_state: Record<string, string[]>;
+  districts: string[];
+  statuses: string[];
+  amount_min: number;
+  amount_max: number;
+  lag_min: number;
+  lag_max: number;
 }
 
 export interface RiskScoresResponse {
@@ -165,15 +189,59 @@ export async function fetchRiskScores(
   method: ScoringMethod,
   page: number,
   pageSize: number,
+  filters?: RiskScoresFilterParams,
 ): Promise<Sourced<RiskScoresResponse>> {
   try {
-    const data = await getJson<RiskScoresResponse>(
-      `/risk-scores?method=${method}&page=${page}&page_size=${pageSize}`,
-    );
+    const params = new URLSearchParams({
+      method,
+      page: String(page),
+      page_size: String(pageSize),
+    });
+    if (filters?.search?.trim()) params.set("search", filters.search.trim());
+    if (filters?.state?.trim()) params.set("state", filters.state.trim());
+    if (filters?.district?.trim()) params.set("district", filters.district.trim());
+    if (filters?.status?.trim()) params.set("status", filters.status.trim());
+    if (filters?.min_amount !== undefined && filters.min_amount !== "" && !isNaN(Number(filters.min_amount))) {
+      params.set("min_amount", String(filters.min_amount));
+    }
+    if (filters?.max_amount !== undefined && filters.max_amount !== "" && !isNaN(Number(filters.max_amount))) {
+      params.set("max_amount", String(filters.max_amount));
+    }
+    if (filters?.min_lag !== undefined && filters.min_lag !== "" && !isNaN(Number(filters.min_lag))) {
+      params.set("min_lag", String(filters.min_lag));
+    }
+    if (filters?.max_lag !== undefined && filters.max_lag !== "" && !isNaN(Number(filters.max_lag))) {
+      params.set("max_lag", String(filters.max_lag));
+    }
+    if (filters?.label_status?.trim()) params.set("label_status", filters.label_status.trim());
+
+    const data = await getJson<RiskScoresResponse>(`/risk-scores?${params.toString()}`);
     return { data, source: "live" };
   } catch (e) {
     return {
       data: mockRiskScores(method, page, pageSize),
+      source: "mock",
+      error: (e as Error).message,
+    };
+  }
+}
+
+export async function fetchFilterOptions(): Promise<Sourced<FilterOptionsResponse>> {
+  try {
+    const data = await getJson<FilterOptionsResponse>(`/filter-options`);
+    return { data, source: "live" };
+  } catch (e) {
+    return {
+      data: {
+        states: [],
+        districts_by_state: {},
+        districts: [],
+        statuses: [],
+        amount_min: 0,
+        amount_max: 50000000,
+        lag_min: 0,
+        lag_max: 1000,
+      },
       source: "mock",
       error: (e as Error).message,
     };
@@ -297,6 +365,7 @@ function mockRiskScores(
         : Math.max(0.01, 0.995 - rank * 0.00006 - r * 0.02);
     return {
       work_index: 100000 + rank * 7 + bias,
+      global_rank: rank,
       MP: at(MPS, rank + bias),
       IDA: at(IDAS, rank * 3 + bias),
       amount: Math.round((5 + r * 240) * 100000),

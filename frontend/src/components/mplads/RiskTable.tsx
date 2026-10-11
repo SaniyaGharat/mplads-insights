@@ -66,7 +66,7 @@ export function RiskTable({
   onSelect,
   onLabel,
 }: Props) {
-  const denom = total > 0 ? total : 15000;
+  const denom = 15000;
   const scoreHeader =
     method === "gat"
       ? "GAT score"
@@ -134,7 +134,14 @@ export function RiskTable({
                       "text-right",
                   )}
                 >
-                  {isScoreCol ? (
+                  {h === "Rank" ? (
+                    <div>
+                      <span>Rank</span>
+                      <span className="block text-[9px] font-normal normal-case tracking-normal text-muted-foreground whitespace-nowrap">
+                        Ranks are global (all 15,000 works)
+                      </span>
+                    </div>
+                  ) : isScoreCol ? (
                     <span
                       title={scoreHeaderTooltip}
                       className="cursor-help underline decoration-dotted underline-offset-2"
@@ -158,7 +165,7 @@ export function RiskTable({
           {rows.map((row, i) => {
             const isSelected = selected === row.work_index;
             const feedback = rowFeedback?.[row.work_index];
-            const rank = offset + i + 1;
+            const rank = row.global_rank ?? (offset + i + 1);
             const pct = (rank / denom) * 100;
             const percentileStr = `Top ${pct.toFixed(2)}%`;
             const band: "Top 1%" | "Top 5%" | "Rest" =
