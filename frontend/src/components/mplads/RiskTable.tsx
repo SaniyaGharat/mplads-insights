@@ -26,7 +26,7 @@ interface Props {
   selected: number | null;
   isLoading: boolean;
   isDemo?: boolean;
-  direction?: "higher_is_riskier" | "lower_is_riskier";
+  direction?: "higher_is_riskier" | "lower_is_riskier" | undefined;
   rowFeedback?: Record<number, { status: "success" | "duplicate" | "error"; message: string }>;
   onSelect: (row: RiskRow) => void;
   onLabel: (workIndex: number, label: LabelValue) => void;

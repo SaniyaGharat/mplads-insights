@@ -8,7 +8,7 @@ interface Props {
   isLoading: boolean;
   isMock: boolean;
   isDemo?: boolean;
-  feedback?: { status: "success" | "duplicate" | "error"; message: string } | null;
+  feedback?: { status: "success" | "duplicate" | "error"; message: string } | null | undefined;
   onLabel: (workIndex: number, label: LabelValue) => void;
 }
 
