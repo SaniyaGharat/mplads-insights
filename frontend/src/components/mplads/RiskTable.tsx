@@ -97,12 +97,12 @@ export function RiskTable({
 
   const reviewFlagTooltip =
     method === "siamese"
-      ? `Flags works ranked in the top ${flagPct}% by Siamese score. Note: Siamese was trained on your 51 labels, so those works will appear flagged by construction. Not a finding of misconduct.`
+      ? `Flags works ranked in the top ${flagPct}% by Siamese score. Note: Siamese was trained on the 51 analyst labels, so those works appear flagged by construction. Not a finding of misconduct.`
       : `Flags works ranked in the top ${flagPct}% for the selected scoring method. This is an audit prioritisation rule, not a finding of misconduct.`;
 
   const scoreHeaderTooltip =
     method === "siamese"
-      ? "Lower distance = more similar to labelled cases. Siamese was trained on your 51 labels, so those works will appear flagged by construction. Not proof of misconduct."
+      ? "Lower distance = more similar to labelled cases. Siamese was trained on the 51 analyst labels, so those works appear flagged by construction. Not proof of misconduct."
       : method === "community"
       ? "Several MPs sanctioning similar amounts at one agency within 30 days. Not proof of misconduct."
       : method === "fusion"
@@ -112,7 +112,7 @@ export function RiskTable({
   const getScoreCellTooltip = (score: number) => {
     const raw = score.toFixed(3);
     if (method === "siamese") {
-      return `Raw distance: ${raw}. Lower distance = more similar to labelled cases. Siamese was trained on your 51 labels, so those works will appear flagged by construction. Not proof of misconduct.`;
+      return `Raw distance: ${raw}. Lower distance = more similar to labelled cases. Siamese was trained on the 51 analyst labels, so those works appear flagged by construction. Not proof of misconduct.`;
     }
     if (method === "community") {
       return `Raw score: ${raw}. Several MPs sanctioning similar amounts at one agency within 30 days. Not proof of misconduct.`;
@@ -232,7 +232,7 @@ export function RiskTable({
                     title={
                       row.review_flag
                         ? method === "siamese"
-                          ? `Ranked within top ${flagPct}% of Siamese. Note: Siamese was trained on your 51 labels, so those works will appear flagged by construction. For review prioritisation; not a finding of misconduct.`
+                          ? `Ranked within top ${flagPct}% of Siamese. Note: Siamese was trained on the 51 analyst labels, so those works appear flagged by construction. For review prioritisation; not a finding of misconduct.`
                           : `Ranked within the top ${flagPct}% of this method. For review prioritisation; not a finding of misconduct.`
                         : `Ranked outside top ${flagPct}%. Not flagged for review.`
                     }

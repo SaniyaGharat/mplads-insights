@@ -297,7 +297,7 @@ export function EvaluationTab() {
           <div>
             <h3 className="text-base font-semibold">Multi-Model Fusion Benchmarks</h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Statistical evaluation of supervised ensemble fusion vs. Bag-of-Tokens (BoT) and Heterogeneous Graph (HIN) baselines.
+              Statistical evaluation of supervised ensemble fusion vs. Bag-of-Tokens (BoT) and hindsight best single detector baselines.
             </p>
           </div>
           <div className="flex border border-border">
@@ -340,9 +340,9 @@ export function EvaluationTab() {
                     <th className="px-3 py-2 font-medium text-right">Δ vs BoT (Mean)</th>
                     <th className="px-3 py-2 font-medium text-center">95% CI vs BoT</th>
                     <th className="px-3 py-2 font-medium text-center">Beats BoT</th>
-                    <th className="px-3 py-2 font-medium text-right">Δ vs HIN (Mean)</th>
-                    <th className="px-3 py-2 font-medium text-center">95% CI vs HIN</th>
-                    <th className="px-3 py-2 font-medium text-center">Beats HIN</th>
+                    <th className="px-3 py-2 font-medium text-right">Δ vs hindsight best single detector (Mean)</th>
+                    <th className="px-3 py-2 font-medium text-center">95% CI vs hindsight best single detector</th>
+                    <th className="px-3 py-2 font-medium text-center">Beats hindsight best single detector</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -410,9 +410,9 @@ export function EvaluationTab() {
                     <th className="px-3 py-2 font-medium text-right">Δ vs BoT (Mean)</th>
                     <th className="px-3 py-2 font-medium text-center">95% CI vs BoT</th>
                     <th className="px-3 py-2 font-medium text-center">Beats BoT</th>
-                    <th className="px-3 py-2 font-medium text-right">Δ vs HIN (Mean)</th>
-                    <th className="px-3 py-2 font-medium text-center">95% CI vs HIN</th>
-                    <th className="px-3 py-2 font-medium text-center">Beats HIN</th>
+                    <th className="px-3 py-2 font-medium text-right">Δ vs hindsight best single detector (Mean)</th>
+                    <th className="px-3 py-2 font-medium text-center">95% CI vs hindsight best single detector</th>
+                    <th className="px-3 py-2 font-medium text-center">Beats hindsight best single detector</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
@@ -475,10 +475,7 @@ export function EvaluationTab() {
               <span>⚠️</span> Baseline Selection & Hindsight Caveat:
             </div>
             <p>
-              The tables present performance vs. both the <strong>train-selected baseline</strong> (Bag-of-Tokens / BoT) and the <strong>heterogeneous graph baseline</strong> (HIN).
-            </p>
-            <p>
-              Note that while models appear to "beat the baseline" on pooled train-selected benchmarks, this <strong>does not represent a hindsight baseline</strong>. Beating the train-selected baseline does not eliminate model selection bias or guarantee outperformance against hindsight optimal baseline choices.
+              On the pooled six families every fusion model was significantly below the hindsight-best detector. Only on strictly unseen F, G, H did the gradient-boosted model beat both baselines (mean AUPRC +0.025, 95% CI +0.008 to +0.047).
             </p>
           </div>
         </div>

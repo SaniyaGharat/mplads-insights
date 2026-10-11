@@ -136,7 +136,7 @@ export function ExplainPanel({
                           )}
                           {mKey === "siamese" && (
                             <span
-                              title="Siamese was trained on your 51 labels, so those works will appear flagged by construction."
+                              title="Siamese was trained on the 51 analyst labels, so those works appear flagged by construction."
                               className="cursor-help rounded bg-secondary px-1 text-[9px] text-muted-foreground"
                             >
                               trained on 51 labels ℹ️
@@ -180,7 +180,7 @@ export function ExplainPanel({
                 • <strong>Method Disagreement:</strong> A work flagged by one method and "Not flagged" by another is the expected finding due to differing model inductive biases, not a bug.
               </p>
               <p>
-                • <strong>Siamese Flags:</strong> Siamese was trained on your 51 labels, so those works will appear flagged by construction.
+                • <strong>Siamese Flags:</strong> Siamese was trained on the 51 analyst labels, so those works appear flagged by construction.
               </p>
             </div>
           </div>
