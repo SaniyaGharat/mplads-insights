@@ -35,6 +35,7 @@
    - Holm-Bonferroni step-down adjustment is applied across the 8 typologies for each detector.
    - Typologies are marked 'detected' only if the adjusted p-value $< 0.05$.
    - Any detector $\times$ typology with AUROC below the null's 5th percentile is labeled *"looks more typical than real works"*.
+   - **Community Scorer Primary-Table Basis**: Primary-table 'Detected' calls for the Community Scorer (flagging Typologies A, D, and F) are evaluated **against a single-MP-slice null** (pseudo-episodes sampled from single eligible MPs' contiguous date works).
 
 4. **Operating Point Metrics**:
    - Base rate = $430 / 15430 = 0.027868$ (2.79%).
@@ -43,8 +44,10 @@
 
 5. **Community Scorer Decomposition & Typology F Behavior**:
    - Typology A achieves 100% activation (`community_score > 0`) with AUROC = 0.9996 and AUPRC = 0.9782 among active works.
-   - Typology F (New-Agency Burst) is solo-MP by design; it only triggers `community_score > 0` (4.92% of works) when other real MPs happen to have co-occurring works at the same IDA within the 30-day window.
+   - Typology F (New-Agency Burst) is solo-MP by design; it only triggers `community_score > 0` (4.92% of works in pooled scoring) when other real MPs happen to have co-occurring works at the same IDA within the 30-day window. Under episode isolation where co-located other-MP real works are removed, Typology F scores strictly 0.0 across all 12 episodes (0% share > 0).
 
-6. **Sensitivity Analysis**:
-   - Evaluation repeated with negatives restricted to 13,431 eligible real works (both MP and IDA $\ge 15$ real works).
+6. **Sensitivity Analysis & Errata (13,431 vs '8,903')**:
+   - Evaluation repeated with negatives restricted to 13,431 eligible real works (both MP and IDA $\ge 15$ real works; 89.54% of all 15,000 real works).
    - Zero changes in 'detected' calls across all detectors and typologies, confirming robustness to entity capacity filters.
+   - **13,431 versus '8,903' Label Error**: In `ml/evaluate_detectors.py` line 700, the sensitivity evaluation table header erroneously printed `--- SENSITIVITY EVALUATION TABLE (8,903 ELIGIBLE NEGATIVES) ---` due to a hardcoded string from an exploratory run. The underlying execution was performed on all 13,431 eligible real works (`df_real_elig`). The correct eligible negatives count is 13,431, not 8,903.
+

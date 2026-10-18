@@ -16,7 +16,7 @@
      - `sanction_amount` (numeric amount)
      - `sanction_lag_days` (numeric lag in days)
      - `work_status_code` (categorical status code: 0 to 5)
-     - `work_category_code` (categorical category code: 0 to 2)
+     - `work_category_code` (categorical category code: 0 to 3)
    - **Excluded by Default**: Date columns (`Sanction Date`, `Recommended date`, year, month, ordinals) and entity real-count columns (`mp_real_count`, `ida_real_count`, work counts) are strictly excluded from default tabular detection pipelines.
    - Defined centrally in `ml/benchmark_features.py`.
 
@@ -39,7 +39,7 @@
      - `structural`: Typologies with single-feature ROC-AUC < 0.85 (within empirical null variation) requiring higher-order graph or structural detection: Typologies A, D, F, G, and H.
    - **Probe-Based Classification (Deprecated)**:
      - The earlier probe-based `detectability_class` column derived from `HistGradientBoostingClassifier(max_depth=3, max_iter=100, learning_rate=0.1)` evaluated via entity-disjoint 5-fold cross-validation is deprecated and replaced by single-feature controls.
-   - Temporal leakage status: No leakage detectable at this power across all typologies (Typology C: Inverted date signal below null; absence of date dependence not claimed).
+   - Temporal leakage status: No leakage detectable at this power across all typologies (Typology C: Inverted date signal below null; pooled probe 0.2866 versus its null; eligible-negative probe 0.384 versus its typology null 0.52 ± 0.21; 7 of 11 usable folds below 0.5; absence of date dependence not claimed).
 
 ---
 
@@ -49,7 +49,7 @@
 |---|---|---|---|---|---|---|---|---|---|
 | **A** | Many-to-One Clustering | 12 | 60 | `structural` | `tabular` (deprecated) | 0.8501 ± 0.0762 | 0.5036 ± 0.1263 | 0.8526 ± 0.0776 | No leakage detectable at this power |
 | **B** | Fast-Tracked Large Sanction | 8 | 34 | `tabular` | `tabular` (deprecated) | 0.9725 ± 0.0389 | 0.5664 ± 0.2289 | 0.9744 ± 0.0317 | No leakage detectable at this power |
-| **C** | Stalled Ghost Work | 8 | 33 | `tabular` | `structural` (deprecated) | 0.7222 ± 0.1664 | 0.2866 ± 0.1319 | 0.7184 ± 0.1795 | Inverted date signal below null; absence of date dependence not claimed |
+| **C** | Stalled Ghost Work | 8 | 33 | `tabular` | `structural` (deprecated) | 0.7222 ± 0.1664 | 0.2866 ± 0.1319 | 0.7184 ± 0.1795 | Inverted date signal below null (pooled probe 0.2866 vs null; eligible-negative probe 0.384 vs typology null 0.52 ± 0.21; 7/11 usable folds < 0.5); absence of date dependence not claimed |
 | **D** | Slow Loose-Variance Clustering | 12 | 60 | `structural` | `tabular` (deprecated) | 0.8554 ± 0.0488 | 0.5307 ± 0.1049 | 0.8518 ± 0.0556 | No leakage detectable at this power |
 | **E** | Split Sanctions (Structuring) | 12 | 63 | `tabular` | `tabular` (deprecated) | 0.9018 ± 0.0909 | 0.5222 ± 0.0871 | 0.9296 ± 0.0688 | No leakage detectable at this power |
 | **F** | New-Agency Burst | 12 | 61 | `structural` | `structural` (deprecated) | 0.7387 ± 0.1038 | 0.4219 ± 0.1494 | 0.7502 ± 0.0886 | No leakage detectable at this power |
@@ -89,4 +89,8 @@
    - *(Note: All reported KS p-values are uncorrected two-sample asymptotic statistics and treat individual works as independent observations.)*
 
 5. **Below-Null Dates-Only Result for Typology C (0.2866 vs Null Interval [0.3267, 0.6824])**:
-   - Typology C's dates-only AUROC 0.2866 lies below the stated null interval [0.3267, 0.6824]; the direction is inverted (predicting lower fraud probability on positives 0.0215 than negatives 0.0443), and we do not claim absence of date dependence.
+   - Typology C's dates-only AUROC 0.2866 lies below the stated null interval [0.3267, 0.6824]; the direction is inverted (predicting lower fraud probability on positives 0.0215 than negatives 0.0443). Qualified across evaluations: pooled probe 0.2866 versus its null; eligible-negative probe 0.384 versus its typology null 0.52 ± 0.21; 7 of 11 usable folds below 0.5. Absence of date dependence is not claimed.
+
+6. **Community Scorer Primary-Table Detection Basis**:
+   - Primary-table zero-label 'Detected' calls for the Community Scorer (flagging Typologies A, D, and F) are evaluated **against a single-MP-slice null** (pseudo-episodes sampled from single eligible MPs' contiguous date works).
+   - Under a co-located matched-host null and under episode isolation with other-MP real works removed, Typology F detection collapses completely (score = 0.0), confirming its primary-table detection was parasitic on co-occurring real other-MP works.
