@@ -17,6 +17,7 @@ import {
   DEFAULT_METHODS,
 } from "@/lib/api";
 import { cn } from "@/lib/utils";
+import { MapChart } from "./MapChart";
 
 interface Props {
   data: GeographyResponse | null;
@@ -200,6 +201,15 @@ export function GeographyTab({
           {currentMethodInfo.note}
         </p>
       )}
+
+      {/* India State Bubble Map */}
+      <MapChart
+        states={data?.states ?? []}
+        selectedState={selectedStateName ?? sortedStates[0]?.state ?? null}
+        onSelectState={(st) => setSelectedStateName(st)}
+        flagPct={flagPct}
+        isMock={isMock}
+      />
 
       {/* Main Dual Table Layout: States Table and Selected State Districts Table */}
       <div className="grid gap-6 lg:grid-cols-12">

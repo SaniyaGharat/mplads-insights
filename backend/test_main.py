@@ -351,4 +351,21 @@ def test_agency_endpoint():
     assert exc.value.status_code == 404
 
 
+def test_geography_endpoint_returns_all_32_states():
+    import backend.main as bm
+    import numpy as np
+
+    if "df_works" not in bm.DATA:
+        bm.DATA["df_works"] = pd.read_csv("data/works_sanctioned_clean.csv")
+        bm.DATA["labels_df"] = pd.read_csv("ml/anomaly_labels.csv")
+        bm.DATA["gat_scores"] = np.load("ml/gat_scores.npy")
+
+    res = asyncio.run(bm.get_geography(method="gat", flag_pct=5))
+    states_returned = {s["state"] for s in res["states"]}
+    assert len(states_returned) == 32
+    df_raw = pd.read_csv("data/works_sanctioned_clean.csv")
+    expected_states = set(df_raw["State"].dropna().unique())
+    assert states_returned == expected_states
+
+
 
