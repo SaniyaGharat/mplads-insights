@@ -478,6 +478,179 @@ async def get_overview(
     }
 
 
+@app.get("/api/geography")
+async def get_geography(
+    method: str = "gat",
+    flag_pct: int = 5,
+):
+    df_works = DATA.get('df_works')
+    if df_works is None:
+        raise HTTPException(status_code=503, detail="Backend data not loaded")
+    _prepare_df_works(df_works)
+
+    method_lower = method.lower()
+    if method_lower not in ("gat", "siamese", "community", "fusion"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown method '{method}'. Available methods: gat, siamese, community, fusion"
+        )
+
+    if flag_pct not in (1, 5, 10):
+        flag_pct = 5
+
+    ranks = _get_method_ranks(method_lower)
+    threshold_rank = int(len(ranks) * (flag_pct / 100.0))
+    flagged_mask = (ranks <= threshold_rank)
+
+    df_geo = df_works.assign(_flagged=flagged_mask)
+
+    states_list = []
+    for state_name, st_group in df_geo.groupby('State', sort=True):
+        st_works = int(len(st_group))
+        st_amount = float(st_group['sanction_amount'].sum())
+        st_flagged = int(st_group['_flagged'].sum())
+        st_share = float(round((st_flagged / st_works) * 100, 2)) if st_works > 0 else 0.0
+
+        districts_list = []
+        for dist_name, dist_group in st_group.groupby('_district', sort=True):
+            dist_works = int(len(dist_group))
+            dist_amount = float(dist_group['sanction_amount'].sum())
+            dist_flagged = int(dist_group['_flagged'].sum())
+            dist_share = float(round((dist_flagged / dist_works) * 100, 2)) if dist_works > 0 else 0.0
+            primary_ida = str(dist_group['IDA'].iloc[0])
+            districts_list.append({
+                "district": str(dist_name),
+                "works": dist_works,
+                "total_amount": dist_amount,
+                "flagged_count": dist_flagged,
+                "flagged_share": dist_share,
+                "primary_ida": primary_ida,
+                "is_small_group": bool(dist_works < 20),
+            })
+
+        districts_list.sort(key=lambda d: d["works"], reverse=True)
+
+        states_list.append({
+            "state": str(state_name),
+            "works": st_works,
+            "total_amount": st_amount,
+            "flagged_count": st_flagged,
+            "flagged_share": st_share,
+            "is_small_group": bool(st_works < 20),
+            "districts": districts_list,
+        })
+
+    # Default sort by works, not by flagged share
+    states_list.sort(key=lambda s: s["works"], reverse=True)
+
+    return {
+        "method": method_lower,
+        "flag_pct": flag_pct,
+        "total_works": int(len(df_works)),
+        "total_flagged": int(np.sum(flagged_mask)),
+        "states": states_list,
+    }
+
+
+@app.get("/api/agency/{ida:path}")
+async def get_agency(
+    ida: str,
+    method: str = "gat",
+    flag_pct: int = 5,
+):
+    df_works = DATA.get('df_works')
+    if df_works is None:
+        raise HTTPException(status_code=503, detail="Backend data not loaded")
+    _prepare_df_works(df_works)
+
+    method_lower = method.lower()
+    if method_lower not in ("gat", "siamese", "community", "fusion"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown method '{method}'. Available methods: gat, siamese, community, fusion"
+        )
+
+    if flag_pct not in (1, 5, 10):
+        flag_pct = 5
+
+    clean_ida = ida.strip()
+    sub_mask = (df_works['IDA'] == clean_ida)
+    if not sub_mask.any():
+        sub_mask = (df_works['_district'] == clean_ida)
+    if not sub_mask.any():
+        sub_mask = df_works['IDA'].str.lower().str.startswith(clean_ida.lower())
+    if not sub_mask.any():
+        raise HTTPException(status_code=404, detail=f"Agency not found: {clean_ida}")
+
+    agency_df = df_works[sub_mask]
+    ranks = _get_method_ranks(method_lower)
+    threshold_rank = int(len(ranks) * (flag_pct / 100.0))
+
+    agency_indices = np.where(sub_mask)[0]
+    agency_ranks = ranks[agency_indices]
+    agency_flags = (agency_ranks <= threshold_rank)
+
+    works_count = int(len(agency_df))
+    total_amount = float(agency_df['sanction_amount'].sum())
+    median_amount = float(agency_df['sanction_amount'].median())
+    median_lag = float(agency_df['sanction_lag_days'].median())
+    flagged_count = int(np.sum(agency_flags))
+    flagged_share = float(round((flagged_count / works_count) * 100, 2)) if works_count > 0 else 0.0
+
+    status_counts = agency_df['Work Status'].value_counts()
+    status_mix = [
+        {
+            "status": str(st),
+            "count": int(cnt),
+            "share": float(round((cnt / works_count) * 100, 2)),
+        }
+        for st, cnt in status_counts.items()
+    ]
+
+    resolved_ida = str(agency_df['IDA'].iloc[0])
+    resolved_district = str(agency_df['_district'].iloc[0])
+    resolved_state = str(agency_df['State'].iloc[0])
+
+    order = np.argsort(agency_ranks)
+    sorted_indices = agency_indices[order]
+    sorted_ranks = agency_ranks[order]
+    sorted_flags = agency_flags[order]
+
+    works_data = []
+    for idx, rk, flg in zip(sorted_indices, sorted_ranks, sorted_flags):
+        row = df_works.iloc[idx]
+        works_data.append({
+            "work_index": int(idx),
+            "global_rank": int(rk),
+            "review_flag": bool(flg),
+            "MP": str(row['MP']),
+            "IDA": str(row['IDA']),
+            "amount": float(row['sanction_amount']),
+            "sanction_lag_days": int(row['sanction_lag_days']),
+            "status": str(row['Work Status']),
+            "category": str(row['Work category']),
+            "agency_median_amount": median_amount,
+            "agency_median_lag": median_lag,
+        })
+
+    return {
+        "ida": resolved_ida,
+        "district": resolved_district,
+        "state": resolved_state,
+        "works": works_count,
+        "total_amount": total_amount,
+        "median_amount": median_amount,
+        "median_lag": median_lag,
+        "flagged_count": flagged_count,
+        "flagged_share": flagged_share,
+        "is_small_group": bool(works_count < 20),
+        "status_mix": status_mix,
+        "works_data": works_data,
+        "method": method_lower,
+        "flag_pct": flag_pct,
+    }
+
+
 @app.get("/api/risk-scores")
 async def get_risk_scores(
     method: str = "gat",

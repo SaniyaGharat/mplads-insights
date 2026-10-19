@@ -51,6 +51,7 @@ interface Props {
   flagPct?: number;
   onSelect: (row: RiskRow) => void;
   onLabel: (workIndex: number, label: LabelValue) => void;
+  onSelectAgency?: ((ida: string) => void) | undefined;
 }
 
 export function RiskTable({
@@ -67,6 +68,7 @@ export function RiskTable({
   flagPct = 5,
   onSelect,
   onLabel,
+  onSelectAgency,
 }: Props) {
   const denom = 15000;
   const scoreHeader =
@@ -199,7 +201,23 @@ export function RiskTable({
                   {rank}
                 </td>
                 <td className="px-3 py-2 font-medium whitespace-nowrap">{row.MP}</td>
-                <td className="max-w-[190px] truncate px-3 py-2 text-muted-foreground">{row.IDA}</td>
+                <td className="max-w-[190px] truncate px-3 py-2 text-muted-foreground">
+                  {onSelectAgency ? (
+                    <button
+                      type="button"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onSelectAgency(row.IDA);
+                      }}
+                      className="text-left underline decoration-dotted underline-offset-2 hover:text-foreground transition-colors max-w-full truncate inline-block"
+                      title={`Open agency view for ${row.IDA}`}
+                    >
+                      {row.IDA}
+                    </button>
+                  ) : (
+                    row.IDA
+                  )}
+                </td>
                 <td className="px-3 py-2 text-right font-mono tabular-nums">
                   {formatINR(row.amount)}
                 </td>

@@ -11,6 +11,7 @@ import {
   fetchStats,
   fetchLabelTotals,
   fetchOverview,
+  fetchGeography,
   postLabel,
   DEFAULT_METHODS,
   type LabelTotals,
@@ -27,6 +28,8 @@ import { ExplainPanel } from "@/components/mplads/ExplainPanel";
 import { NetworkGraph } from "@/components/mplads/NetworkGraph";
 import { EvaluationTab } from "@/components/mplads/EvaluationTab";
 import { OverviewTab } from "@/components/mplads/OverviewTab";
+import { GeographyTab } from "@/components/mplads/GeographyTab";
+import { AgencyDrawer } from "@/components/mplads/AgencyDrawer";
 
 const TITLE = "MPLADS Anomaly Detection";
 const DESCRIPTION =
@@ -56,8 +59,14 @@ function parseUrlParams() {
   const flagPctParam = Number(sp.get("flag_pct"));
   const flagPctVal: 1 | 5 | 10 = flagPctParam === 1 || flagPctParam === 10 ? flagPctParam : 5;
   const tabParam = sp.get("tab")?.toLowerCase();
-  const tabVal: "overview" | "triage" | "evaluation" =
-    tabParam === "evaluation" ? "evaluation" : tabParam === "triage" ? "triage" : "overview";
+  const tabVal: "overview" | "geography" | "triage" | "evaluation" =
+    tabParam === "evaluation"
+      ? "evaluation"
+      : tabParam === "geography"
+      ? "geography"
+      : tabParam === "triage"
+      ? "triage"
+      : "overview";
 
   return {
     method: validMethods.includes(m as ScoringMethod) ? (m as ScoringMethod) : ("gat" as ScoringMethod),
@@ -77,7 +86,8 @@ function parseUrlParams() {
 }
 
 function Dashboard() {
-  const [activeTab, setActiveTab] = useState<"overview" | "triage" | "evaluation">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "geography" | "triage" | "evaluation">("overview");
+  const [selectedAgencyId, setSelectedAgencyId] = useState<string | null>(null);
   const [flagPct, setFlagPct] = useState<1 | 5 | 10>(5);
   const [method, setMethod] = useState<ScoringMethod>("gat");
   const [page, setPage] = useState<number>(1);
@@ -202,6 +212,11 @@ function Dashboard() {
     queryFn: () => fetchOverview(method, flagPct),
   });
 
+  const geographyQuery = useQuery({
+    queryKey: ["geography", method, flagPct],
+    queryFn: () => fetchGeography(method, flagPct),
+  });
+
   const filterOptionsQuery = useQuery({
     queryKey: ["filter-options"],
     queryFn: fetchFilterOptions,
@@ -298,6 +313,7 @@ function Dashboard() {
     explain.data?.source === "mock" ||
     labelTotals.data?.source === "mock" ||
     overviewQuery.data?.source === "mock" ||
+    geographyQuery.data?.source === "mock" ||
     health.data?.source === "mock";
 
   const label = useMutation({
@@ -445,6 +461,17 @@ function Dashboard() {
               Overview
             </button>
             <button
+              onClick={() => setActiveTab("geography")}
+              className={cn(
+                "border-b-2 px-5 py-3 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer",
+                activeTab === "geography"
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
+              )}
+            >
+              Geography
+            </button>
+            <button
               onClick={() => setActiveTab("triage")}
               className={cn(
                 "border-b-2 px-5 py-3 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer",
@@ -481,6 +508,21 @@ function Dashboard() {
               flagPct={flagPct}
               setFlagPct={setFlagPct}
               methodList={methodList}
+            />
+          </main>
+        ) : activeTab === "geography" ? (
+          <main className="mx-auto max-w-[1600px] px-6 py-6">
+            <GeographyTab
+              data={geographyQuery.data?.data ?? null}
+              isLoading={geographyQuery.isLoading}
+              isMock={geographyQuery.data?.source === "mock"}
+              error={geographyQuery.data?.error}
+              method={method}
+              setMethod={setMethod}
+              flagPct={flagPct}
+              setFlagPct={setFlagPct}
+              methodList={methodList}
+              onSelectAgency={(ida) => setSelectedAgencyId(ida)}
             />
           </main>
         ) : activeTab === "evaluation" ? (
@@ -869,6 +911,7 @@ function Dashboard() {
                   rowFeedback={rowFeedback}
                   onSelect={setSelected}
                   onLabel={onLabel}
+                  onSelectAgency={(ida) => setSelectedAgencyId(ida)}
                 />
               )}
 
@@ -940,6 +983,13 @@ function Dashboard() {
             </div>
           </main>
         )}
+
+        <AgencyDrawer
+          ida={selectedAgencyId}
+          onClose={() => setSelectedAgencyId(null)}
+          method={method}
+          flagPct={flagPct}
+        />
       </div>
 
       <footer className="border-t border-border bg-card py-5 text-center text-xs text-muted-foreground">

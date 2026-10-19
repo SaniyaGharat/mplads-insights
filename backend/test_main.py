@@ -252,4 +252,103 @@ def test_overview_endpoint_methods():
         assert res["kpis"]["method"] == method
         assert res["kpis"]["flagged_count"] == 750
 
+
+def test_geography_endpoint_sums_and_small_groups():
+    import backend.main as bm
+    import numpy as np
+
+    if "df_works" not in bm.DATA:
+        bm.DATA["df_works"] = pd.read_csv("data/works_sanctioned_clean.csv")
+        bm.DATA["labels_df"] = pd.read_csv("ml/anomaly_labels.csv")
+        bm.DATA["gat_scores"] = np.load("ml/gat_scores.npy")
+
+    res = asyncio.run(bm.get_geography(method="gat", flag_pct=5))
+    assert res["total_works"] == 15000
+    assert res["total_flagged"] == 750
+    assert len(res["states"]) == 32
+
+    # Verify default sort is by works descending, NOT by flagged share
+    for i in range(len(res["states"]) - 1):
+        assert res["states"][i]["works"] >= res["states"][i + 1]["works"]
+
+    # Sum of state works == 15000, sum of flagged == 750
+    sum_state_works = sum(s["works"] for s in res["states"])
+    sum_state_flagged = sum(s["flagged_count"] for s in res["states"])
+    assert sum_state_works == 15000
+    assert sum_state_flagged == 750
+
+    # Sum of all nested district works == 15000, sum of flagged == 750
+    all_districts = [d for s in res["states"] for d in s["districts"]]
+    sum_dist_works = sum(d["works"] for d in all_districts)
+    sum_dist_flagged = sum(d["flagged_count"] for d in all_districts)
+    assert sum_dist_works == 15000
+    assert sum_dist_flagged == 750
+
+    # Small group handling
+    small_groups = [d for d in all_districts if d["works"] < 20]
+    assert len(small_groups) > 0
+    for d in small_groups:
+        assert d["is_small_group"] is True
+
+    normal_groups = [d for d in all_districts if d["works"] >= 20]
+    assert len(normal_groups) > 0
+    for d in normal_groups:
+        assert d["is_small_group"] is False
+
+
+def test_geography_endpoint_cutoffs():
+    import backend.main as bm
+    import numpy as np
+
+    if "df_works" not in bm.DATA:
+        bm.DATA["df_works"] = pd.read_csv("data/works_sanctioned_clean.csv")
+        bm.DATA["labels_df"] = pd.read_csv("ml/anomaly_labels.csv")
+        bm.DATA["gat_scores"] = np.load("ml/gat_scores.npy")
+
+    res_1 = asyncio.run(bm.get_geography(flag_pct=1))
+    assert sum(s["flagged_count"] for s in res_1["states"]) == 150
+
+    res_10 = asyncio.run(bm.get_geography(flag_pct=10))
+    assert sum(s["flagged_count"] for s in res_10["states"]) == 1500
+
+
+def test_agency_endpoint():
+    import backend.main as bm
+    import numpy as np
+    from fastapi import HTTPException
+
+    if "df_works" not in bm.DATA:
+        bm.DATA["df_works"] = pd.read_csv("data/works_sanctioned_clean.csv")
+        bm.DATA["labels_df"] = pd.read_csv("ml/anomaly_labels.csv")
+        bm.DATA["gat_scores"] = np.load("ml/gat_scores.npy")
+
+    # Exact IDA lookup
+    ida_name = "DHARWAD(DEPUTY COMMISSIONER DHARWAR_IDA)"
+    res = asyncio.run(bm.get_agency(ida=ida_name, method="gat", flag_pct=5))
+    assert res["ida"] == ida_name
+    assert res["district"] == "DHARWAD"
+    assert res["state"] == "Karnataka"
+    assert res["works"] == 15
+    assert res["total_amount"] > 0
+    assert res["median_amount"] > 0
+    assert res["median_lag"] >= 0
+    assert len(res["status_mix"]) > 0
+    assert len(res["works_data"]) == 15
+    first_work = res["works_data"][0]
+    assert "global_rank" in first_work
+    assert "review_flag" in first_work
+    assert first_work["agency_median_amount"] == res["median_amount"]
+    assert first_work["agency_median_lag"] == res["median_lag"]
+
+    # District lookup fallback
+    res_dist = asyncio.run(bm.get_agency(ida="DHARWAD"))
+    assert res_dist["district"] == "DHARWAD"
+    assert res_dist["works"] == 15
+
+    # 404 for nonexistent agency
+    with pytest.raises(HTTPException) as exc:
+        asyncio.run(bm.get_agency(ida="NONEXISTENT_AGENCY_XYZ_123"))
+    assert exc.value.status_code == 404
+
+
 

@@ -169,6 +169,65 @@ export interface OverviewResponse {
   scatter_points: ScatterPoint[];
 }
 
+export interface DistrictGeoItem {
+  district: string;
+  works: number;
+  total_amount: number;
+  flagged_count: number;
+  flagged_share: number;
+  primary_ida: string;
+  is_small_group: boolean;
+}
+
+export interface StateGeoItem {
+  state: string;
+  works: number;
+  total_amount: number;
+  flagged_count: number;
+  flagged_share: number;
+  is_small_group: boolean;
+  districts: DistrictGeoItem[];
+}
+
+export interface GeographyResponse {
+  method: string;
+  flag_pct: number;
+  total_works: number;
+  total_flagged: number;
+  states: StateGeoItem[];
+}
+
+export interface AgencyWorkItem {
+  work_index: number;
+  global_rank: number;
+  review_flag: boolean;
+  MP: string;
+  IDA: string;
+  amount: number;
+  sanction_lag_days: number;
+  status: string;
+  category: string;
+  agency_median_amount: number;
+  agency_median_lag: number;
+}
+
+export interface AgencyResponse {
+  ida: string;
+  district: string;
+  state: string;
+  works: number;
+  total_amount: number;
+  median_amount: number;
+  median_lag: number;
+  flagged_count: number;
+  flagged_share: number;
+  is_small_group: boolean;
+  status_mix: { status: string; count: number; share: number }[];
+  works_data: AgencyWorkItem[];
+  method: string;
+  flag_pct: number;
+}
+
 export interface RiskScoresResponse {
   data: RiskRow[];
   page: number;
@@ -384,6 +443,40 @@ export async function fetchOverview(
   } catch (e) {
     return {
       data: mockOverview(method, flagPct),
+      source: "mock",
+      error: (e as Error).message,
+    };
+  }
+}
+
+export async function fetchGeography(
+  method: ScoringMethod = "gat",
+  flagPct: 1 | 5 | 10 = 5,
+): Promise<Sourced<GeographyResponse>> {
+  try {
+    const data = await getJson<GeographyResponse>(`/geography?method=${method}&flag_pct=${flagPct}`);
+    return { data, source: "live" };
+  } catch (e) {
+    return {
+      data: mockGeography(method, flagPct),
+      source: "mock",
+      error: (e as Error).message,
+    };
+  }
+}
+
+export async function fetchAgency(
+  ida: string,
+  method: ScoringMethod = "gat",
+  flagPct: 1 | 5 | 10 = 5,
+): Promise<Sourced<AgencyResponse>> {
+  try {
+    const encoded = encodeURIComponent(ida);
+    const data = await getJson<AgencyResponse>(`/agency/${encoded}?method=${method}&flag_pct=${flagPct}`);
+    return { data, source: "live" };
+  } catch (e) {
+    return {
+      data: mockAgency(ida, method, flagPct),
       source: "mock",
       error: (e as Error).message,
     };
@@ -813,6 +906,103 @@ function mockOverview(method: ScoringMethod, flagPct: 1 | 5 | 10): OverviewRespo
     by_status,
     monthly_timeline,
     scatter_points,
+  };
+}
+
+function mockGeography(method: ScoringMethod, flagPct: 1 | 5 | 10): GeographyResponse {
+  const total_works = 15000;
+  const total_flagged = Math.round(total_works * (flagPct / 100));
+
+  const states: StateGeoItem[] = STATES.map((state, sIdx) => {
+    const numDistricts = 4;
+    const districts: DistrictGeoItem[] = Array.from({ length: numDistricts }, (_, dIdx) => {
+      // Deterministically create some small groups (<20 works) and normal groups
+      const isSmall = (sIdx + dIdx) % 3 === 0;
+      const dWorks = isSmall ? Math.round(5 + seeded(sIdx * 10 + dIdx) * 12) : Math.round(80 + seeded(sIdx * 10 + dIdx) * 300);
+      const dFlagged = Math.round(dWorks * (flagPct / 100) * (0.8 + seeded(sIdx * 7 + dIdx) * 0.4));
+      const distName = `${state}_Dist_${dIdx + 1}`;
+      return {
+        district: distName,
+        works: dWorks,
+        total_amount: dWorks * 500000,
+        flagged_count: dFlagged,
+        flagged_share: Number(((dFlagged / dWorks) * 100).toFixed(2)),
+        primary_ida: `${distName}(COLLECTORATE_${distName}_IDA)`,
+        is_small_group: dWorks < 20,
+      };
+    }).sort((a, b) => b.works - a.works);
+
+    const sWorks = districts.reduce((acc, d) => acc + d.works, 0);
+    const sAmount = districts.reduce((acc, d) => acc + d.total_amount, 0);
+    const sFlagged = districts.reduce((acc, d) => acc + d.flagged_count, 0);
+    const sShare = Number(((sFlagged / sWorks) * 100).toFixed(2));
+
+    return {
+      state,
+      works: sWorks,
+      total_amount: sAmount,
+      flagged_count: sFlagged,
+      flagged_share: sShare,
+      is_small_group: sWorks < 20,
+      districts,
+    };
+  }).sort((a, b) => b.works - a.works);
+
+  return {
+    method,
+    flag_pct: flagPct,
+    total_works,
+    total_flagged,
+    states,
+  };
+}
+
+function mockAgency(ida: string, method: ScoringMethod, flagPct: 1 | 5 | 10): AgencyResponse {
+  const works = 35;
+  const flagged_count = Math.max(1, Math.round(works * (flagPct / 100)));
+  const median_amount = 450000;
+  const median_lag = 48;
+  const total_amount = works * median_amount;
+
+  const dist = ida.split("(")[0]?.trim() || "DHARWAD";
+  const state = at(STATES, 0);
+
+  const works_data: AgencyWorkItem[] = Array.from({ length: works }, (_, i) => {
+    const isFlg = i < flagged_count;
+    return {
+      work_index: i + 100,
+      global_rank: isFlg ? (i + 1) * 30 : 2000 + i * 50,
+      review_flag: isFlg,
+      MP: at(MPS, i),
+      IDA: ida,
+      amount: Math.round(median_amount * (0.6 + seeded(i * 3) * 0.9)),
+      sanction_lag_days: Math.round(median_lag * (0.5 + seeded(i * 5) * 1.2)),
+      status: at(STATUSES, i),
+      category: at(CATEGORIES, i),
+      agency_median_amount: median_amount,
+      agency_median_lag: median_lag,
+    };
+  });
+
+  return {
+    ida,
+    district: dist,
+    state,
+    works,
+    total_amount,
+    median_amount,
+    median_lag,
+    flagged_count,
+    flagged_share: Number(((flagged_count / works) * 100).toFixed(2)),
+    is_small_group: works < 20,
+    status_mix: STATUSES.map((status, i) => ({
+      status,
+      count: Math.round(works / 4),
+      share: 25.0,
+    })),
+    works_data,
+    method,
+    flag_pct: flagPct,
   };
 }
 
