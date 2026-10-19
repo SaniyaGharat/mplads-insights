@@ -297,6 +297,7 @@ function Dashboard() {
     stats.data?.source === "mock" ||
     explain.data?.source === "mock" ||
     labelTotals.data?.source === "mock" ||
+    overviewQuery.data?.source === "mock" ||
     health.data?.source === "mock";
 
   const label = useMutation({

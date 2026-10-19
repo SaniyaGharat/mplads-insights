@@ -737,8 +737,10 @@ function mockExplain(workIndex: number): ExplainResponse {
 function mockOverview(method: ScoringMethod, flagPct: 1 | 5 | 10): OverviewResponse {
   const total_works = 15000;
   const flagged_count = Math.round(total_works * (flagPct / 100));
-  const total_amount = 8642000000;
-  const flagged_amount = Math.round(total_amount * (flagPct / 100) * 1.3);
+  // Neutral placeholder figures for demo mode (real totals only read from live API)
+  const total_amount = 0;
+  const flagged_amount = 0;
+  const avg_lag_days = 0;
 
   const by_state: StateOverviewItem[] = STATES.map((state, i) => {
     const total_count = Math.round(400 + seeded(i + 1) * 600);
@@ -751,7 +753,7 @@ function mockOverview(method: ScoringMethod, flagPct: 1 | 5 | 10): OverviewRespo
       total_amount: total_count * 500000,
       flagged_amount: flg * 650000,
     };
-  }).sort((a, b) => b.flagged_count - a.flagged_count);
+  }).sort((a, b) => b.flagged_share - a.flagged_share);
 
   const by_status: StatusOverviewItem[] = STATUSES.map((status, i) => {
     const total_count = Math.round(1500 + seeded(i + 10) * 3000);
@@ -764,7 +766,7 @@ function mockOverview(method: ScoringMethod, flagPct: 1 | 5 | 10): OverviewRespo
       total_amount: total_count * 500000,
       flagged_amount: flg * 600000,
     };
-  }).sort((a, b) => b.flagged_count - a.flagged_count);
+  }).sort((a, b) => b.flagged_share - a.flagged_share);
 
   const months = [
     "2024-07", "2024-08", "2024-09", "2024-10", "2024-11", "2024-12",
@@ -800,10 +802,10 @@ function mockOverview(method: ScoringMethod, flagPct: 1 | 5 | 10): OverviewRespo
     kpis: {
       total_works,
       total_amount,
-      avg_lag_days: 187,
+      avg_lag_days,
       flagged_count,
       flagged_amount,
-      flagged_amount_share: Number(((flagged_amount / total_amount) * 100).toFixed(2)),
+      flagged_amount_share: 0,
       flag_pct: flagPct,
       method,
     },

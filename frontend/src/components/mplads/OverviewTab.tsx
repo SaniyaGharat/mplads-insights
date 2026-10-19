@@ -119,10 +119,12 @@ export function OverviewTab({
     return { flaggedPoints: flagged, normalPoints: normal };
   }, [data?.scatter_points]);
 
-  // Top 15 states for clean chart display
+  // Top 15 states sorted by flagged share (%) for primary display
   const topStates = useMemo(() => {
     if (!data?.by_state) return [];
-    return data.by_state.slice(0, 15);
+    return [...data.by_state]
+      .sort((a, b) => b.flagged_share - a.flagged_share || b.flagged_count - a.flagged_count)
+      .slice(0, 15);
   }, [data?.by_state]);
 
   return (
@@ -192,41 +194,48 @@ export function OverviewTab({
         </div>
       </div>
 
-      {/* Method Note */}
-      {currentMethodInfo && (
-        <p className="text-xs text-muted-foreground">
-          <span className="font-semibold text-foreground">{currentMethodInfo.name}:</span>{" "}
-          {currentMethodInfo.note}
-        </p>
-      )}
+      {/* Method Note & Siamese Callout */}
+      <div className="space-y-1.5">
+        {currentMethodInfo && (
+          <p className="text-xs text-muted-foreground">
+            <span className="font-semibold text-foreground">{currentMethodInfo.name}:</span>{" "}
+            {currentMethodInfo.note}
+          </p>
+        )}
+        {method === "siamese" && (
+          <div className="border border-alert/30 bg-alert/10 px-4 py-2.5 text-xs font-medium text-alert">
+            Siamese was trained on the 51 analyst labels, so those works appear flagged by construction.
+          </div>
+        )}
+      </div>
 
       {/* KPI Cards Grid */}
       <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
         <KpiCard
           label="Total Sanctioned Works"
-          value={isLoading ? "…" : (kpis?.total_works ?? 15000).toLocaleString("en-IN")}
-          subvalue="All evaluated works"
+          value={isLoading ? "…" : isMock ? "15,000" : (kpis?.total_works ?? 15000).toLocaleString("en-IN")}
+          subvalue={isMock ? "Sample data" : "All evaluated works"}
         />
         <KpiCard
           label="Total Sanction Amount"
-          value={isLoading ? "…" : formatINR(kpis?.total_amount ?? 0)}
-          subvalue="Across all IDA authorities"
+          value={isLoading ? "…" : isMock ? "—" : formatINR(kpis?.total_amount ?? 0)}
+          subvalue={isMock ? "Sample data" : "Across all IDA authorities"}
         />
         <KpiCard
           label="Average Sanction Lag"
-          value={isLoading ? "…" : `${Math.round(kpis?.avg_lag_days ?? 0)} days`}
-          subvalue="Recommendation to sanction"
+          value={isLoading ? "…" : isMock ? "—" : `${Math.round(kpis?.avg_lag_days ?? 0)} days`}
+          subvalue={isMock ? "Sample data" : "Recommendation to sanction"}
         />
         <KpiCard
           label={`Works Flagged for Review (${flagPct}%)`}
           value={isLoading ? "…" : (kpis?.flagged_count ?? 0).toLocaleString("en-IN")}
-          subvalue={`Lead for review in top ${flagPct}% score position`}
+          subvalue={isMock ? `Sample data · Top ${flagPct}% score position` : `Lead for review in top ${flagPct}% score position`}
           accent="text-alert font-bold"
         />
         <KpiCard
           label="Amount in Flagged Works"
-          value={isLoading ? "…" : formatINR(kpis?.flagged_amount ?? 0)}
-          subvalue={`${kpis?.flagged_amount_share ?? 0}% of total sanction budget`}
+          value={isLoading ? "…" : isMock ? "—" : formatINR(kpis?.flagged_amount ?? 0)}
+          subvalue={isMock ? "Sample data" : `${kpis?.flagged_amount_share ?? 0}% of total sanction budget`}
           accent="text-alert"
         />
       </div>
@@ -236,11 +245,11 @@ export function OverviewTab({
         {/* 1. Flagged Works by State */}
         <ChartCard
           title="Flagged Works by State"
-          subtitle={`Number of works flagged for review in top ${flagPct}% score position by state (top 15 states)`}
+          subtitle={`Share of works flagged for review in top ${flagPct}% score position by state (top 15 states, share % is primary)`}
         >
           <div className="h-[320px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={topStates} margin={{ top: 10, right: 20, left: 0, bottom: 45 }}>
+              <ComposedChart data={topStates} margin={{ top: 10, right: 30, left: 0, bottom: 45 }}>
                 <CartesianGrid stroke={GRID} strokeDasharray="3 3" vertical={false} />
                 <XAxis
                   dataKey="state"
@@ -250,7 +259,29 @@ export function OverviewTab({
                   textAnchor="end"
                   height={55}
                 />
-                <YAxis {...axisProps} allowDecimals={false} />
+                <YAxis
+                  yAxisId="left"
+                  {...axisProps}
+                  unit="%"
+                  label={{
+                    value: "Flagged Share (%)",
+                    angle: -90,
+                    position: "insideLeft",
+                    style: { fill: AXIS, fontSize: 10 },
+                  }}
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  {...axisProps}
+                  allowDecimals={false}
+                  label={{
+                    value: "Flagged Count",
+                    angle: 90,
+                    position: "insideRight",
+                    style: { fill: AXIS, fontSize: 10 },
+                  }}
+                />
                 <Tooltip
                   contentStyle={{
                     background: "var(--card)",
@@ -260,18 +291,39 @@ export function OverviewTab({
                     fontFamily: "var(--font-mono)",
                   }}
                   formatter={(val: number, name: string) => [
-                    val.toLocaleString("en-IN"),
-                    name === "flagged_count" ? "Flagged for review" : "Total works",
+                    name === "flagged_share" ? `${val}%` : val.toLocaleString("en-IN"),
+                    name === "flagged_share"
+                      ? "Flagged share (%) [Primary]"
+                      : name === "flagged_count"
+                        ? "Flagged works count [Secondary]"
+                        : "Total works",
                   ]}
                   labelStyle={{ color: AXIS, fontWeight: 600 }}
                 />
                 <Legend
                   wrapperStyle={{ fontSize: 11, paddingTop: 6 }}
-                  formatter={(val: string) => (val === "flagged_count" ? "Flagged for review" : "Total works")}
+                  formatter={(val: string) =>
+                    val === "flagged_share"
+                      ? "Flagged share (%) [Primary]"
+                      : "Flagged count [Secondary]"
+                  }
                 />
-                <Bar dataKey="flagged_count" name="flagged_count" fill={ALERT} radius={[2, 2, 0, 0]} />
-                <Bar dataKey="total_count" name="total_count" fill={NAVY} radius={[2, 2, 0, 0]} opacity={0.35} />
-              </BarChart>
+                <Bar
+                  yAxisId="left"
+                  dataKey="flagged_share"
+                  name="flagged_share"
+                  fill={ALERT}
+                  radius={[2, 2, 0, 0]}
+                />
+                <Bar
+                  yAxisId="right"
+                  dataKey="flagged_count"
+                  name="flagged_count"
+                  fill={NAVY}
+                  radius={[2, 2, 0, 0]}
+                  opacity={0.35}
+                />
+              </ComposedChart>
             </ResponsiveContainer>
           </div>
         </ChartCard>
@@ -515,7 +567,7 @@ export function OverviewTab({
             </ResponsiveContainer>
           </div>
           <p className="mt-2 text-[11px] text-muted-foreground text-center">
-            Points represent a sample of up to 3,000 works (all flagged works at {flagPct}% cutoff + balanced sample of normal works).
+            All flagged works plus a random sample of other works (max 3,000 points)
           </p>
         </ChartCard>
       </div>
