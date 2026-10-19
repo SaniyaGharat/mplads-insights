@@ -171,4 +171,85 @@ def test_filter_options_endpoint():
     assert options["amount_min"] == 12881.0
     assert options["lag_min"] == 0
     assert options["lag_max"] == 732
+
+
+def test_overview_endpoint_defaults_and_kpis():
+    import backend.main as bm
+    import numpy as np
+
+    if "df_works" not in bm.DATA:
+        bm.DATA["df_works"] = pd.read_csv("data/works_sanctioned_clean.csv")
+        bm.DATA["labels_df"] = pd.read_csv("ml/anomaly_labels.csv")
+        bm.DATA["gat_scores"] = np.load("ml/gat_scores.npy")
+
+    res = asyncio.run(bm.get_overview())
+    assert set(res.keys()) == {"kpis", "by_state", "by_status", "monthly_timeline", "scatter_points"}
+    kpis = res["kpis"]
+    assert kpis["total_works"] == 15000
+    assert kpis["flag_pct"] == 5
+    assert kpis["flagged_count"] == 750
+    assert kpis["method"] == "gat"
+    assert kpis["total_amount"] > 0
+    assert kpis["flagged_amount"] > 0
+    assert kpis["flagged_amount_share"] > 0
+
+    # by_state
+    assert len(res["by_state"]) == 32
+    assert "state" in res["by_state"][0]
+    assert "flagged_count" in res["by_state"][0]
+    assert res["by_state"][0]["flagged_count"] >= res["by_state"][-1]["flagged_count"]
+
+    # by_status
+    assert len(res["by_status"]) > 0
+    assert "status" in res["by_status"][0]
+    assert "flagged_count" in res["by_status"][0]
+
+    # monthly_timeline
+    assert len(res["monthly_timeline"]) > 0
+    assert "month" in res["monthly_timeline"][0]
+    assert "flagged_share" in res["monthly_timeline"][0]
+
+    # scatter_points
+    assert len(res["scatter_points"]) <= 3000
+    flagged_in_scatter = sum(1 for p in res["scatter_points"] if p["flagged"])
+    assert flagged_in_scatter == 750
+
+
+def test_overview_endpoint_cutoffs():
+    import backend.main as bm
+    import numpy as np
+
+    if "df_works" not in bm.DATA:
+        bm.DATA["df_works"] = pd.read_csv("data/works_sanctioned_clean.csv")
+        bm.DATA["labels_df"] = pd.read_csv("ml/anomaly_labels.csv")
+        bm.DATA["gat_scores"] = np.load("ml/gat_scores.npy")
+
+    res_1 = asyncio.run(bm.get_overview(flag_pct=1))
+    assert res_1["kpis"]["flagged_count"] == 150
+    assert res_1["kpis"]["flag_pct"] == 1
+
+    res_10 = asyncio.run(bm.get_overview(flag_pct=10))
+    assert res_10["kpis"]["flagged_count"] == 1500
+    assert res_10["kpis"]["flag_pct"] == 10
+
+    # Invalid flag_pct defaults to 5
+    res_inv = asyncio.run(bm.get_overview(flag_pct=25))
+    assert res_inv["kpis"]["flagged_count"] == 750
+    assert res_inv["kpis"]["flag_pct"] == 5
+
+
+def test_overview_endpoint_methods():
+    import backend.main as bm
+    import numpy as np
+
+    if "df_works" not in bm.DATA:
+        bm.DATA["df_works"] = pd.read_csv("data/works_sanctioned_clean.csv")
+        bm.DATA["labels_df"] = pd.read_csv("ml/anomaly_labels.csv")
+        bm.DATA["gat_scores"] = np.load("ml/gat_scores.npy")
+
+    for method in ["gat", "siamese", "community", "fusion"]:
+        res = asyncio.run(bm.get_overview(method=method))
+        assert res["kpis"]["method"] == method
+        assert res["kpis"]["flagged_count"] == 750
+
 

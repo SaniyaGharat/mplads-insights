@@ -336,6 +336,148 @@ def _get_method_ranks(method_name: str) -> np.ndarray:
     return ranks
 
 
+@app.get("/api/overview")
+async def get_overview(
+    method: str = "gat",
+    flag_pct: int = 5,
+):
+    df_works = DATA.get('df_works')
+    if df_works is None:
+        raise HTTPException(status_code=503, detail="Backend data not loaded")
+    _prepare_df_works(df_works)
+
+    method_lower = method.lower()
+    if method_lower not in ("gat", "siamese", "community", "fusion"):
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown method '{method}'. Available methods: gat, siamese, community, fusion"
+        )
+
+    if flag_pct not in (1, 5, 10):
+        flag_pct = 5
+
+    ranks = _get_method_ranks(method_lower)
+    threshold_rank = int(len(ranks) * (flag_pct / 100.0))
+    flagged_mask = (ranks <= threshold_rank)
+
+    total_works = int(len(df_works))
+    total_amount = float(df_works['sanction_amount'].sum())
+    avg_lag_days = float(df_works['sanction_lag_days'].mean())
+    flagged_count = int(np.sum(flagged_mask))
+    flagged_amount = float(df_works.loc[flagged_mask, 'sanction_amount'].sum())
+    flagged_amount_share = float(round((flagged_amount / total_amount) * 100, 2)) if total_amount > 0 else 0.0
+
+    # 1. Flagged works by state (bar)
+    state_groups = df_works.assign(_flagged=flagged_mask).groupby('State')
+    by_state = []
+    for state_name, group in state_groups:
+        st_total = int(len(group))
+        st_flagged = int(group['_flagged'].sum())
+        st_amount = float(group['sanction_amount'].sum())
+        st_flagged_amount = float(group.loc[group['_flagged'], 'sanction_amount'].sum())
+        st_share = float(round((st_flagged / st_total) * 100, 2)) if st_total > 0 else 0.0
+        by_state.append({
+            "state": str(state_name),
+            "total_count": st_total,
+            "flagged_count": st_flagged,
+            "flagged_share": st_share,
+            "total_amount": st_amount,
+            "flagged_amount": st_flagged_amount,
+        })
+    by_state.sort(key=lambda x: x["flagged_count"], reverse=True)
+
+    # 2. Flagged works by status
+    status_groups = df_works.assign(_flagged=flagged_mask).groupby('Work Status')
+    by_status = []
+    for status_name, group in status_groups:
+        stat_total = int(len(group))
+        stat_flagged = int(group['_flagged'].sum())
+        stat_amount = float(group['sanction_amount'].sum())
+        stat_flagged_amount = float(group.loc[group['_flagged'], 'sanction_amount'].sum())
+        stat_share = float(round((stat_flagged / stat_total) * 100, 2)) if stat_total > 0 else 0.0
+        by_status.append({
+            "status": str(status_name),
+            "total_count": stat_total,
+            "flagged_count": stat_flagged,
+            "flagged_share": stat_share,
+            "total_amount": stat_amount,
+            "flagged_amount": stat_flagged_amount,
+        })
+    by_status.sort(key=lambda x: x["flagged_count"], reverse=True)
+
+    # 3. Monthly sanction timeline with the flagged share
+    month_series = df_works['Sanction Date'].astype(str).str.slice(0, 7)
+    month_groups = df_works.assign(_flagged=flagged_mask, _month=month_series).groupby('_month')
+    monthly_timeline = []
+    for month_str, group in month_groups:
+        m_total = int(len(group))
+        m_flagged = int(group['_flagged'].sum())
+        m_amount = float(group['sanction_amount'].sum())
+        m_flagged_amount = float(group.loc[group['_flagged'], 'sanction_amount'].sum())
+        m_share = float(round((m_flagged / m_total) * 100, 2)) if m_total > 0 else 0.0
+        monthly_timeline.append({
+            "month": str(month_str),
+            "total_count": m_total,
+            "flagged_count": m_flagged,
+            "flagged_share": m_share,
+            "total_amount": m_amount,
+            "flagged_amount": m_flagged_amount,
+        })
+    monthly_timeline.sort(key=lambda x: x["month"])
+
+    # 4. Lag vs amount scatter with flagged works highlighted (sample at most 3,000 points)
+    flagged_indices = np.where(flagged_mask)[0]
+    non_flagged_indices = np.where(~flagged_mask)[0]
+    max_scatter = 3000
+    if len(flagged_indices) >= max_scatter:
+        selected_flagged = flagged_indices[np.argsort(ranks[flagged_indices])[:max_scatter]]
+        sampled_indices = selected_flagged
+    else:
+        num_non_flagged = min(len(non_flagged_indices), max_scatter - len(flagged_indices))
+        rng = np.random.RandomState(42)
+        sampled_non_flagged = rng.choice(non_flagged_indices, size=num_non_flagged, replace=False)
+        sampled_indices = np.concatenate([flagged_indices, sampled_non_flagged])
+
+    amounts = df_works['sanction_amount'].values[sampled_indices]
+    lags = df_works['sanction_lag_days'].values[sampled_indices]
+    states = df_works['State'].values[sampled_indices]
+    statuses = df_works['Work Status'].values[sampled_indices]
+    scatter_flags = flagged_mask[sampled_indices]
+    scatter_ranks = ranks[sampled_indices]
+
+    scatter_points = [
+        {
+            "work_index": int(idx),
+            "amount": float(amt),
+            "lag": int(lg),
+            "flagged": bool(flg),
+            "rank": int(rk),
+            "state": str(st),
+            "status": str(stat),
+        }
+        for idx, amt, lg, flg, rk, st, stat in zip(
+            sampled_indices, amounts, lags, scatter_flags, scatter_ranks, states, statuses
+        )
+    ]
+
+    return {
+        "kpis": {
+            "total_works": total_works,
+            "total_amount": total_amount,
+            "avg_lag_days": avg_lag_days,
+            "flagged_count": flagged_count,
+            "flagged_amount": flagged_amount,
+            "flagged_amount_share": flagged_amount_share,
+            "flag_pct": flag_pct,
+            "method": method_lower,
+        },
+        "by_state": by_state,
+        "by_status": by_status,
+        "monthly_timeline": monthly_timeline,
+        "scatter_points": scatter_points,
+    }
+
+
 @app.get("/api/risk-scores")
 async def get_risk_scores(
     method: str = "gat",

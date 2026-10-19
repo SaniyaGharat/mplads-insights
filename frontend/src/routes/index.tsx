@@ -10,6 +10,7 @@ import {
   fetchRiskScores,
   fetchStats,
   fetchLabelTotals,
+  fetchOverview,
   postLabel,
   DEFAULT_METHODS,
   type LabelTotals,
@@ -25,6 +26,7 @@ import { StatsOverview } from "@/components/mplads/StatsOverview";
 import { ExplainPanel } from "@/components/mplads/ExplainPanel";
 import { NetworkGraph } from "@/components/mplads/NetworkGraph";
 import { EvaluationTab } from "@/components/mplads/EvaluationTab";
+import { OverviewTab } from "@/components/mplads/OverviewTab";
 
 const TITLE = "MPLADS Anomaly Detection";
 const DESCRIPTION =
@@ -53,7 +55,9 @@ function parseUrlParams() {
   const validMethods: ScoringMethod[] = ["gat", "siamese", "community", "fusion"];
   const flagPctParam = Number(sp.get("flag_pct"));
   const flagPctVal: 1 | 5 | 10 = flagPctParam === 1 || flagPctParam === 10 ? flagPctParam : 5;
-  const tabVal: "triage" | "evaluation" = sp.get("tab") === "evaluation" ? "evaluation" : "triage";
+  const tabParam = sp.get("tab")?.toLowerCase();
+  const tabVal: "overview" | "triage" | "evaluation" =
+    tabParam === "evaluation" ? "evaluation" : tabParam === "triage" ? "triage" : "overview";
 
   return {
     method: validMethods.includes(m as ScoringMethod) ? (m as ScoringMethod) : ("gat" as ScoringMethod),
@@ -73,7 +77,7 @@ function parseUrlParams() {
 }
 
 function Dashboard() {
-  const [activeTab, setActiveTab] = useState<"triage" | "evaluation">("triage");
+  const [activeTab, setActiveTab] = useState<"overview" | "triage" | "evaluation">("overview");
   const [flagPct, setFlagPct] = useState<1 | 5 | 10>(5);
   const [method, setMethod] = useState<ScoringMethod>("gat");
   const [page, setPage] = useState<number>(1);
@@ -115,7 +119,7 @@ function Dashboard() {
       if (p.maxLag) setMaxLag(p.maxLag);
       if (p.labelStatus) setLabelStatus(p.labelStatus);
       if (p.flagPct !== 5) setFlagPct(p.flagPct);
-      if (p.tab !== "triage") setActiveTab(p.tab);
+      if (p.tab) setActiveTab(p.tab);
     }
   }, []);
 
@@ -147,7 +151,7 @@ function Dashboard() {
     if (maxLag.trim()) sp.set("max_lag", maxLag.trim());
     if (labelStatus.trim()) sp.set("label_status", labelStatus.trim());
     if (flagPct !== 5) sp.set("flag_pct", String(flagPct));
-    if (activeTab !== "triage") sp.set("tab", activeTab);
+    if (activeTab !== "overview") sp.set("tab", activeTab);
 
     const qs = sp.toString();
     const targetUrl = qs ? `${window.location.pathname}?${qs}` : window.location.pathname;
@@ -187,11 +191,16 @@ function Dashboard() {
       setMaxLag(p.maxLag);
       setLabelStatus(p.labelStatus);
       setFlagPct(p.flagPct);
-      setActiveTab(p.tab);
+      if (p.tab) setActiveTab(p.tab);
     };
     window.addEventListener("popstate", handlePopState);
     return () => window.removeEventListener("popstate", handlePopState);
   }, []);
+
+  const overviewQuery = useQuery({
+    queryKey: ["overview", method, flagPct],
+    queryFn: () => fetchOverview(method, flagPct),
+  });
 
   const filterOptionsQuery = useQuery({
     queryKey: ["filter-options"],
@@ -424,6 +433,17 @@ function Dashboard() {
         <nav className="border-b border-border bg-card">
           <div className="mx-auto flex max-w-[1600px] gap-1 px-6">
             <button
+              onClick={() => setActiveTab("overview")}
+              className={cn(
+                "border-b-2 px-5 py-3 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer",
+                activeTab === "overview"
+                  ? "border-primary text-foreground"
+                  : "border-transparent text-muted-foreground hover:text-foreground hover:border-border",
+              )}
+            >
+              Overview
+            </button>
+            <button
               onClick={() => setActiveTab("triage")}
               className={cn(
                 "border-b-2 px-5 py-3 text-xs font-semibold uppercase tracking-wider transition-colors cursor-pointer",
@@ -448,7 +468,21 @@ function Dashboard() {
           </div>
         </nav>
 
-        {activeTab === "evaluation" ? (
+        {activeTab === "overview" ? (
+          <main className="mx-auto max-w-[1600px] px-6 py-6">
+            <OverviewTab
+              data={overviewQuery.data?.data ?? null}
+              isLoading={overviewQuery.isLoading}
+              isMock={overviewQuery.data?.source === "mock"}
+              error={overviewQuery.data?.error}
+              method={method}
+              setMethod={setMethod}
+              flagPct={flagPct}
+              setFlagPct={setFlagPct}
+              methodList={methodList}
+            />
+          </main>
+        ) : activeTab === "evaluation" ? (
           <main className="mx-auto max-w-[1600px] px-6 py-6">
             <EvaluationTab />
           </main>

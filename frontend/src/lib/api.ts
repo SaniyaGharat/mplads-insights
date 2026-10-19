@@ -113,6 +113,62 @@ export interface EvaluationResponse {
   limitations: string[];
 }
 
+export interface OverviewKpis {
+  total_works: number;
+  total_amount: number;
+  avg_lag_days: number;
+  flagged_count: number;
+  flagged_amount: number;
+  flagged_amount_share: number;
+  flag_pct: number;
+  method: string;
+}
+
+export interface StateOverviewItem {
+  state: string;
+  total_count: number;
+  flagged_count: number;
+  flagged_share: number;
+  total_amount: number;
+  flagged_amount: number;
+}
+
+export interface StatusOverviewItem {
+  status: string;
+  total_count: number;
+  flagged_count: number;
+  flagged_share: number;
+  total_amount: number;
+  flagged_amount: number;
+}
+
+export interface MonthlyTimelineItem {
+  month: string;
+  total_count: number;
+  flagged_count: number;
+  flagged_share: number;
+  total_amount: number;
+  flagged_amount: number;
+}
+
+export interface ScatterPoint {
+  work_index: number;
+  amount: number;
+  lag: number;
+  flagged: boolean;
+  rank: number;
+  state: string;
+  status: string;
+}
+
+export interface OverviewResponse {
+  kpis: OverviewKpis;
+  by_state: StateOverviewItem[];
+  by_status: StatusOverviewItem[];
+  monthly_timeline: MonthlyTimelineItem[];
+  scatter_points: ScatterPoint[];
+}
+
 export interface RiskScoresResponse {
   data: RiskRow[];
   page: number;
@@ -318,6 +374,22 @@ export async function fetchEvaluation(): Promise<Sourced<EvaluationResponse>> {
   }
 }
 
+export async function fetchOverview(
+  method: ScoringMethod = "gat",
+  flagPct: 1 | 5 | 10 = 5,
+): Promise<Sourced<OverviewResponse>> {
+  try {
+    const data = await getJson<OverviewResponse>(`/overview?method=${method}&flag_pct=${flagPct}`);
+    return { data, source: "live" };
+  } catch (e) {
+    return {
+      data: mockOverview(method, flagPct),
+      source: "mock",
+      error: (e as Error).message,
+    };
+  }
+}
+
 export async function fetchFilterOptions(): Promise<Sourced<FilterOptionsResponse>> {
   try {
     const data = await getJson<FilterOptionsResponse>(`/filter-options`);
@@ -420,6 +492,10 @@ const IDAS = [
   "Panchayat Samiti, Bardhaman",
 ];
 
+const STATES = [
+  "Karnataka", "Bihar", "West Bengal", "Gujarat", "Punjab", "Madhya Pradesh",
+  "Kerala", "Tamil Nadu", "Maharashtra", "Uttar Pradesh", "Rajasthan", "Andhra Pradesh"
+];
 const STATUSES = ["Sanctioned", "In Progress", "Completed", "Withheld"];
 const CATEGORIES = ["Roads & Bridges", "Sanitation", "Education", "Health", "Water Supply"];
 const LABELS: LabelStatus[] = ["Training Label", "GAT-Top", "New"];
@@ -655,6 +731,86 @@ function mockExplain(workIndex: number): ExplainResponse {
       neighbor: pick(i + 1),
       weight: Math.min(0.99, Number(at(weights, i).toFixed(2))),
     })),
+  };
+}
+
+function mockOverview(method: ScoringMethod, flagPct: 1 | 5 | 10): OverviewResponse {
+  const total_works = 15000;
+  const flagged_count = Math.round(total_works * (flagPct / 100));
+  const total_amount = 8642000000;
+  const flagged_amount = Math.round(total_amount * (flagPct / 100) * 1.3);
+
+  const by_state: StateOverviewItem[] = STATES.map((state, i) => {
+    const total_count = Math.round(400 + seeded(i + 1) * 600);
+    const flg = Math.round(total_count * (flagPct / 100) * (0.8 + seeded(i + 2) * 0.5));
+    return {
+      state,
+      total_count,
+      flagged_count: flg,
+      flagged_share: Number(((flg / total_count) * 100).toFixed(2)),
+      total_amount: total_count * 500000,
+      flagged_amount: flg * 650000,
+    };
+  }).sort((a, b) => b.flagged_count - a.flagged_count);
+
+  const by_status: StatusOverviewItem[] = STATUSES.map((status, i) => {
+    const total_count = Math.round(1500 + seeded(i + 10) * 3000);
+    const flg = Math.round(total_count * (flagPct / 100) * (0.8 + seeded(i + 20) * 0.4));
+    return {
+      status,
+      total_count,
+      flagged_count: flg,
+      flagged_share: Number(((flg / total_count) * 100).toFixed(2)),
+      total_amount: total_count * 500000,
+      flagged_amount: flg * 600000,
+    };
+  }).sort((a, b) => b.flagged_count - a.flagged_count);
+
+  const months = [
+    "2024-07", "2024-08", "2024-09", "2024-10", "2024-11", "2024-12",
+    "2025-01", "2025-02", "2025-03", "2025-04", "2025-05", "2025-06",
+  ];
+  const monthly_timeline: MonthlyTimelineItem[] = months.map((month, i) => {
+    const total_count = Math.round(400 + seeded(i + 30) * 1500);
+    const flg = Math.round(total_count * (flagPct / 100) * (0.7 + seeded(i + 40) * 0.6));
+    return {
+      month,
+      total_count,
+      flagged_count: flg,
+      flagged_share: Number(((flg / total_count) * 100).toFixed(2)),
+      total_amount: total_count * 500000,
+      flagged_amount: flg * 650000,
+    };
+  });
+
+  const scatter_points: ScatterPoint[] = Array.from({ length: 1000 }, (_, i) => {
+    const isFlg = i < flagged_count / 2;
+    return {
+      work_index: i,
+      amount: Math.round(50000 + seeded(i * 3) * 4500000),
+      lag: Math.round(10 + seeded(i * 7) * 400),
+      flagged: isFlg,
+      rank: isFlg ? i + 1 : 1000 + i,
+      state: at(STATES, i % STATES.length),
+      status: at(STATUSES, i % STATUSES.length),
+    };
+  });
+
+  return {
+    kpis: {
+      total_works,
+      total_amount,
+      avg_lag_days: 187,
+      flagged_count,
+      flagged_amount,
+      flagged_amount_share: Number(((flagged_amount / total_amount) * 100).toFixed(2)),
+      flag_pct: flagPct,
+      method,
+    },
+    by_state,
+    by_status,
+    monthly_timeline,
+    scatter_points,
   };
 }
 
