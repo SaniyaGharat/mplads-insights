@@ -9,6 +9,7 @@ interface Props {
   selectedState: string | null;
   onSelectState: (state: string) => void;
   flagPct: 1 | 5 | 10;
+  methodName?: string;
   isMock?: boolean;
 }
 
@@ -44,9 +45,17 @@ interface TooltipData {
 }
 
 // Continuous color interpolator for Flagged Share %
-// Palette: Low (0%) calm sage/slate -> Mid (flagPct%) warm amber -> High (2x flagPct%+) alert terracotta
-function getShareColor(share: number, flagPct: number, isMock: boolean): string {
-  if (isMock) return "rgb(156, 163, 175)"; // neutral grey for mock
+// Palette: Low (0%) calm sage -> Mid (flagPct%) warm amber -> High (2.2x flagPct%+) alert terracotta
+// Also computes perceived luminance (ITU-R BT.601) to ensure dark text on light fills and white on dark fills
+function getShareColor(
+  share: number,
+  flagPct: number,
+  isMock: boolean,
+): { fill: string; textColor: string } {
+  if (isMock) {
+    // Neutral grey in demo mode: luminance = ~163 (light fill -> dark text)
+    return { fill: "rgb(156, 163, 175)", textColor: "#18181b" };
+  }
 
   const norm = Math.max(0, Math.min(1, share / (flagPct * 2.2)));
 
@@ -65,7 +74,13 @@ function getShareColor(share: number, flagPct: number, isMock: boolean): string 
     g = Math.round(149 + t * (74 - 149));
     b = Math.round(67 + t * (41 - 67));
   }
-  return `rgb(${r}, ${g}, ${b})`;
+
+  // Perceived relative luminance
+  const luminance = 0.299 * r + 0.587 * g + 0.114 * b;
+  // Dark text on light fills (> 140 luminance, e.g. amber); white text on dark fills (<= 140, e.g. terracotta or deep sage)
+  const textColor = luminance > 140 ? "#111827" : "#ffffff";
+
+  return { fill: `rgb(${r}, ${g}, ${b})`, textColor };
 }
 
 export function MapChart({
@@ -73,6 +88,7 @@ export function MapChart({
   selectedState,
   onSelectState,
   flagPct,
+  methodName = "GAT",
   isMock = false,
 }: Props) {
   const [tooltip, setTooltip] = useState<TooltipData | null>(null);
@@ -105,8 +121,8 @@ export function MapChart({
     return map;
   }, [states]);
 
-  // Compute matched and unmatched states
-  const { matchedGeoFeatures, unmatchedWorksStates } = useMemo(() => {
+  // Compute matched features, unmatched works states, and unrepresented GeoJSON features
+  const { matchedGeoFeatures, unmatchedWorksStates, unrepresentedGeoNames } = useMemo(() => {
     const matched = new Set<string>();
     const featuresWithData = featureList.map((f) => {
       const geoName = f.properties.st_nm as string;
@@ -123,7 +139,17 @@ export function MapChart({
     });
 
     const unmatched = states.filter((s) => !matched.has(s.state));
-    return { matchedGeoFeatures: featuresWithData, unmatchedWorksStates: unmatched };
+
+    const unrepresented = featureList
+      .map((f) => f.properties.st_nm as string)
+      .filter((geoName) => !stateByGeoName.has(geoName.toLowerCase().trim()))
+      .sort();
+
+    return {
+      matchedGeoFeatures: featuresWithData,
+      unmatchedWorksStates: unmatched,
+      unrepresentedGeoNames: unrepresented,
+    };
   }, [featureList, stateByGeoName, pathGenerator, states]);
 
   // Sqrt radius scale: max ~4,500 works -> 26px, min 3.5px
@@ -137,7 +163,7 @@ export function MapChart({
         <div>
           <h3 className="text-sm font-semibold tracking-tight">Geographic Distribution of Sanctioned Works</h3>
           <p className="text-xs text-muted-foreground">
-            Bubble size represents volume of works · Bubble color shows flagged share (%) at top {flagPct}% cutoff
+            Bubble size = number of works. Colour = flagged share (%) at the top {flagPct}% cutoff of the {methodName} score.
           </p>
         </div>
         {isMock && (
@@ -162,11 +188,12 @@ export function MapChart({
             </linearGradient>
           </defs>
 
-          {/* 1. Base State Polygons */}
+          {/* 1. Base State Polygons (grey for regions without works) */}
           <g className="state-boundaries">
             {matchedGeoFeatures.map(({ feature, pathD, dataItem }) => {
               const geoName = feature.properties.st_nm;
               const isSelected = selectedState && dataItem?.state === selectedState;
+              const hasData = Boolean(dataItem);
               return (
                 <path
                   key={geoName}
@@ -175,13 +202,15 @@ export function MapChart({
                     "transition-colors duration-150",
                     isSelected
                       ? "fill-primary/15 stroke-primary stroke-[1.5]"
-                      : "fill-secondary/35 stroke-border hover:fill-secondary/70 stroke-[0.8]",
+                      : hasData
+                        ? "fill-secondary/35 stroke-border hover:fill-secondary/70 stroke-[0.8]"
+                        : "fill-muted/70 stroke-border/60 stroke-[0.6]",
                   )}
                   onClick={() => {
                     if (dataItem) onSelectState(dataItem.state);
                   }}
                 >
-                  <title>{geoName}</title>
+                  <title>{geoName}{!hasData ? " (no works in this sample)" : ""}</title>
                 </path>
               );
             })}
@@ -194,7 +223,7 @@ export function MapChart({
 
               const isSelected = selectedState === dataItem.state;
               const r = getRadius(dataItem.works);
-              const fillColor = getShareColor(dataItem.flagged_share, flagPct, isMock);
+              const { fill: fillColor, textColor } = getShareColor(dataItem.flagged_share, flagPct, isMock);
               const isSmall = dataItem.works < 20;
 
               return (
@@ -203,8 +232,7 @@ export function MapChart({
                   transform={`translate(${centroid[0]}, ${centroid[1]})`}
                   className="cursor-pointer transition-transform duration-100 hover:scale-110"
                   onClick={() => onSelectState(dataItem.state)}
-                  onMouseEnter={(e) => {
-                    const rect = e.currentTarget.getBoundingClientRect();
+                  onMouseEnter={() => {
                     setTooltip({
                       stateName: dataItem.state,
                       works: dataItem.works,
@@ -239,12 +267,19 @@ export function MapChart({
                     strokeDasharray={isSmall ? "3 2" : undefined}
                   />
 
-                  {/* Centered label for large states */}
-                  {dataItem.works >= 800 && (
+                  {/* Centered label: dark text on light fills, white text on dark fills */}
+                  {dataItem.works >= 600 && (
                     <text
                       textAnchor="middle"
-                      dy="0.3em"
-                      className="pointer-events-none select-none font-mono text-[9px] font-bold fill-white drop-shadow-[0_1px_1px_rgba(0,0,0,0.8)]"
+                      dy="0.32em"
+                      fill={textColor}
+                      className="pointer-events-none select-none font-mono text-[9px] font-bold"
+                      style={{
+                        textShadow:
+                          textColor === "#ffffff"
+                            ? "0 1px 2px rgba(0,0,0,0.75)"
+                            : "0 1px 2px rgba(255,255,255,0.85)",
+                      }}
                     >
                       {dataItem.works >= 1000 ? `${(dataItem.works / 1000).toFixed(1)}k` : dataItem.works}
                     </text>
@@ -362,15 +397,22 @@ export function MapChart({
         </svg>
       </div>
 
-      {/* Mandatory Statutory Note */}
-      <div className="mt-3 border-t border-border pt-3 text-xs text-muted-foreground">
+      {/* Mandatory Statutory Note & Explanations under Map */}
+      <div className="mt-3 space-y-1.5 border-t border-border pt-3 text-xs text-muted-foreground">
         <p className="leading-relaxed">
           Bubble size = number of works. Larger states have more flagged works simply because they have more works. Scores prioritise audit attention; they are not findings of misconduct.
         </p>
 
-        {/* Visible Footnote for any unmatched states */}
+        {/* Grey regions with no works */}
+        {unrepresentedGeoNames.length > 0 && (
+          <p className="leading-relaxed text-muted-foreground">
+            Grey regions have no works in this sample: {unrepresentedGeoNames.join(", ")}
+          </p>
+        )}
+
+        {/* Visible Footnote for any unmatched works states */}
         {unmatchedWorksStates.length > 0 && (
-          <p className="mt-1 text-[11px] text-muted-foreground/80">
+          <p className="text-[11px] text-muted-foreground/80">
             <strong>Not shown:</strong> {unmatchedWorksStates.map((s) => s.state).join(", ")} (no boundary match).
           </p>
         )}

@@ -208,6 +208,7 @@ export function GeographyTab({
         selectedState={selectedStateName ?? sortedStates[0]?.state ?? null}
         onSelectState={(st) => setSelectedStateName(st)}
         flagPct={flagPct}
+        methodName={currentMethodInfo?.name ?? method.toUpperCase()}
         isMock={isMock}
       />
 
@@ -430,6 +431,11 @@ export function GeographyTab({
           </div>
         </div>
       </div>
+
+      {/* Credit Line in Geography Tab Footer */}
+      <footer className="border-t border-border pt-4 text-center text-xs text-muted-foreground">
+        Boundaries: adarshbiradar/maps-geojson, licence unverified
+      </footer>
     </div>
   );
 }
