@@ -102,11 +102,11 @@ export function ExplainPanel({
             <table className="w-full text-left text-xs border border-border">
               <thead>
                 <tr className="border-b border-border bg-secondary/40 text-[11px] text-muted-foreground">
-                  <th className="px-2.5 py-1.5 font-medium">Method</th>
-                  <th className="px-2.5 py-1.5 font-medium text-right">Global Rank</th>
-                  <th className="px-2.5 py-1.5 font-medium text-right">Percentile</th>
-                  <th className="px-2.5 py-1.5 font-medium text-right">Score</th>
-                  <th className="px-2.5 py-1.5 font-medium text-center">Status</th>
+                  <th className="px-2 py-1.5 font-medium">Method</th>
+                  <th className="px-2 py-1.5 font-medium text-right whitespace-nowrap">Global Rank</th>
+                  <th className="px-2 py-1.5 font-medium text-right">Percentile</th>
+                  <th className="px-2 py-1.5 font-medium text-right">Score</th>
+                  <th className="px-2 py-1.5 font-medium text-center">Status</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-border">
@@ -124,8 +124,8 @@ export function ExplainPanel({
                         isCurrent ? "bg-primary/5 font-medium" : "hover:bg-muted/40",
                       )}
                     >
-                      <td className="px-2.5 py-2">
-                        <div className="flex items-center gap-1.5">
+                      <td className="px-2 py-1.5">
+                        <div className="flex flex-wrap items-center gap-1">
                           <span className={cn(isCurrent && "font-semibold text-foreground")}>
                             {meta.name}
                           </span>
@@ -137,9 +137,9 @@ export function ExplainPanel({
                           {mKey === "siamese" && (
                             <span
                               title="Siamese was trained on the 51 analyst labels, so those works appear flagged by construction."
-                              className="cursor-help rounded bg-secondary px-1 text-[9px] text-muted-foreground"
+                              className="cursor-help rounded bg-secondary px-1 text-[9px] text-muted-foreground whitespace-nowrap"
                             >
-                              trained on 51 labels ℹ️
+                              51 labels ℹ️
                             </span>
                           )}
                           {isCurrent && (
@@ -149,19 +149,19 @@ export function ExplainPanel({
                           )}
                         </div>
                       </td>
-                      <td className="px-2.5 py-2 text-right font-mono tabular-nums">
+                      <td className="px-2 py-1.5 text-right font-mono tabular-nums whitespace-nowrap">
                         {mInfo ? `#${mInfo.global_rank.toLocaleString("en-IN")}` : "—"}
                       </td>
-                      <td className="px-2.5 py-2 text-right font-mono tabular-nums">
+                      <td className="px-2 py-1.5 text-right font-mono tabular-nums whitespace-nowrap">
                         {mInfo ? `Top ${mInfo.percentile.toFixed(2)}%` : "—"}
                       </td>
-                      <td className="px-2.5 py-2 text-right font-mono tabular-nums text-muted-foreground">
+                      <td className="px-2 py-1.5 text-right font-mono tabular-nums text-muted-foreground whitespace-nowrap">
                         {mInfo ? mInfo.score.toFixed(3) : "—"}
                       </td>
-                      <td className="px-2.5 py-2 text-center">
+                      <td className="px-2 py-1.5 text-center whitespace-nowrap">
                         <span
                           className={cn(
-                            "inline-block rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight",
+                            "inline-block rounded px-1.5 py-0.5 text-[10px] font-medium leading-tight whitespace-nowrap",
                             isFlagged
                               ? "bg-amber-500/15 text-amber-800 dark:text-amber-300"
                               : "bg-muted text-muted-foreground",

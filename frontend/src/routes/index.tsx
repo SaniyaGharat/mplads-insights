@@ -530,7 +530,7 @@ function Dashboard() {
             <EvaluationTab />
           </main>
         ) : (
-          <main className="mx-auto grid max-w-[1600px] gap-5 px-6 py-6 xl:grid-cols-[minmax(0,1fr)_420px]">
+          <main className="mx-auto grid max-w-[1600px] gap-5 px-6 py-6 xl:grid-cols-[minmax(0,1fr)_480px]">
             <div className="xl:col-span-2">
               <StatsOverview
                 stats={stats.data?.data ?? null}
