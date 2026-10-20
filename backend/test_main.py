@@ -388,4 +388,21 @@ def test_geography_endpoint_returns_all_32_states():
     assert states_returned == expected_states
 
 
+def test_evaluation_tab_required_strings():
+    import os
+    tab_path = os.path.join("frontend", "src", "components", "mplads", "EvaluationTab.tsx")
+    assert os.path.exists(tab_path), f"File not found: {tab_path}"
+    with open(tab_path, "r", encoding="utf-8") as f:
+        content = f.read()
+
+    required_strings = [
+        "Baseline Selection & Hindsight Caveat",
+        "hindsight-best",
+        "Methodological Limitations",
+        "not constitute findings",
+    ]
+    for s in required_strings:
+        assert s in content, f"Missing required string in EvaluationTab.tsx: '{s}'"
+
+
 
