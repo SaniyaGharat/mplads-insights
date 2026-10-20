@@ -19,17 +19,25 @@ function LabelBadge({ value }: { value: string }) {
   );
 }
 
-function BandBadge({ band }: { band: "Top 1%" | "Top 5%" | "Rest" }) {
+function BandBadge({
+  band,
+  isFlagged,
+}: {
+  band: "Top 0.5%" | "Top 1%" | "Top 5%" | "Top 10%" | "Rest" | string;
+  isFlagged?: boolean | undefined;
+}) {
   const styles: Record<string, string> = {
+    "Top 0.5%": "border-alert/50 bg-alert/15 text-alert font-bold",
     "Top 1%": "border-foreground/35 bg-secondary text-foreground font-semibold",
-    "Top 5%": "border-border bg-secondary/70 text-foreground/80 font-medium",
+    "Top 5%": "border-border bg-secondary/80 text-foreground/90 font-medium",
+    "Top 10%": "border-border bg-secondary/60 text-foreground/80 font-medium",
     Rest: "border-border/60 bg-muted/40 text-muted-foreground font-normal",
   };
   return (
     <span
       className={cn(
         "inline-block whitespace-nowrap border px-1.5 py-0.5 text-[11px] tracking-wide uppercase",
-        styles[band],
+        styles[band] ?? "border-border/60 bg-muted/40 text-muted-foreground font-normal",
       )}
     >
       {band}
@@ -49,6 +57,8 @@ interface Props {
   direction?: "higher_is_riskier" | "lower_is_riskier" | undefined;
   rowFeedback?: Record<number, { status: "success" | "duplicate" | "error"; message: string }>;
   flagPct?: number;
+  cutoffScore?: number | undefined;
+  thresholdRank?: number | undefined;
   onSelect: (row: RiskRow) => void;
   onLabel: (workIndex: number, label: LabelValue) => void;
   onSelectAgency?: ((ida: string) => void) | undefined;
@@ -66,6 +76,8 @@ export function RiskTable({
   direction,
   rowFeedback,
   flagPct = 5,
+  cutoffScore,
+  thresholdRank,
   onSelect,
   onLabel,
   onSelectAgency,
@@ -111,18 +123,22 @@ export function RiskTable({
       ? "Experimental rank-ordering score combining detector signals. Not proof of misconduct."
       : "A high score means the work is statistically unusual compared with other works. It is not proof of misconduct.";
 
-  const getScoreCellTooltip = (score: number) => {
+  const getScoreCellTooltip = (score: number, isFlagged?: boolean) => {
     const raw = score.toFixed(3);
+    const cutoffText =
+      cutoffScore !== undefined
+        ? `Cutoff threshold: ${direction === "lower_is_riskier" ? "≤" : "≥"} ${cutoffScore.toFixed(3)} (Top ${flagPct}%). ${isFlagged ? "Meets cutoff (Flagged for review)" : "Below cutoff"}. `
+        : "";
     if (method === "siamese") {
-      return `Raw distance: ${raw}. Lower distance = more similar to labelled cases. Siamese was trained on the 51 analyst labels, so those works appear flagged by construction. Not proof of misconduct.`;
+      return `${cutoffText}Raw distance: ${raw}. Lower distance = more similar to labelled cases. Siamese was trained on the 51 analyst labels, so those works appear flagged by construction. Not proof of misconduct.`;
     }
     if (method === "community") {
-      return `Raw score: ${raw}. Several MPs sanctioning similar amounts at one agency within 30 days. Not proof of misconduct.`;
+      return `${cutoffText}Raw score: ${raw}. Several MPs sanctioning similar amounts at one agency within 30 days. Not proof of misconduct.`;
     }
     if (method === "fusion") {
-      return `Raw score: ${raw}. Experimental rank-ordering score combining detector signals. Not proof of misconduct.`;
+      return `${cutoffText}Raw score: ${raw}. Experimental rank-ordering score combining detector signals. Not proof of misconduct.`;
     }
-    return `Raw score: ${raw}. A high score means the work is statistically unusual compared with other works. It is not proof of misconduct.`;
+    return `${cutoffText}Raw score: ${raw}. A high score means the work is statistically unusual compared with other works. It is not proof of misconduct.`;
   };
 
   return (
@@ -159,19 +175,41 @@ export function RiskTable({
                       Review Flag
                     </span>
                   ) : isScoreCol ? (
-                    <span
-                      title={scoreHeaderTooltip}
-                      className="cursor-help underline decoration-dotted underline-offset-2"
-                    >
-                      {h}
-                    </span>
+                    <div>
+                      <span
+                        title={scoreHeaderTooltip}
+                        className="cursor-help underline decoration-dotted underline-offset-2"
+                      >
+                        {h}
+                      </span>
+                      {cutoffScore !== undefined && (
+                        <span className="block text-[9px] font-mono normal-case tracking-normal text-muted-foreground whitespace-nowrap">
+                          {direction === "lower_is_riskier" ? "cutoff: ≤ " : "cutoff: ≥ "}
+                          {cutoffScore.toFixed(3)}
+                        </span>
+                      )}
+                      {direction === "lower_is_riskier" && cutoffScore === undefined && (
+                        <span className="block text-[9px] font-normal lowercase tracking-normal text-muted-foreground">
+                          (lower distance = more similar)
+                        </span>
+                      )}
+                    </div>
+                  ) : h === "Percentile" ? (
+                    <div>
+                      <span>{h}</span>
+                      <span className="block text-[9px] font-mono normal-case tracking-normal text-muted-foreground whitespace-nowrap">
+                        cutoff: top {flagPct}%
+                      </span>
+                    </div>
+                  ) : h === "Band" ? (
+                    <div>
+                      <span>{h}</span>
+                      <span className="block text-[9px] font-mono normal-case tracking-normal text-muted-foreground whitespace-nowrap">
+                        top {flagPct}% cutoff
+                      </span>
+                    </div>
                   ) : (
                     h
-                  )}
-                  {isScoreCol && direction === "lower_is_riskier" && (
-                    <span className="block text-[9px] font-normal lowercase tracking-normal text-muted-foreground">
-                      (lower distance = more similar)
-                    </span>
                   )}
                 </th>
               );
@@ -185,8 +223,16 @@ export function RiskTable({
             const rank = row.global_rank ?? (offset + i + 1);
             const pct = (rank / denom) * 100;
             const percentileStr = `Top ${pct.toFixed(2)}%`;
-            const band: "Top 1%" | "Top 5%" | "Rest" =
-              pct <= 1.0 ? "Top 1%" : pct <= 5.0 ? "Top 5%" : "Rest";
+
+            let band: string;
+            if (flagPct === 1) {
+              band = pct <= 0.5 ? "Top 0.5%" : pct <= 1.0 ? "Top 1%" : "Rest";
+            } else if (flagPct === 10) {
+              band = pct <= 1.0 ? "Top 1%" : pct <= 5.0 ? "Top 5%" : pct <= 10.0 ? "Top 10%" : "Rest";
+            } else {
+              // flagPct === 5
+              band = pct <= 1.0 ? "Top 1%" : pct <= 5.0 ? "Top 5%" : "Rest";
+            }
 
             return (
               <tr
@@ -231,19 +277,25 @@ export function RiskTable({
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap text-muted-foreground">{row.status}</td>
                 <td
-                  className="px-3 py-2 text-right font-mono tabular-nums cursor-help"
-                  title={getScoreCellTooltip(row.score)}
+                  className={cn(
+                    "px-3 py-2 text-right font-mono tabular-nums cursor-help",
+                    row.review_flag && "font-semibold text-foreground",
+                  )}
+                  title={getScoreCellTooltip(row.score, row.review_flag)}
                 >
                   {row.score.toFixed(3)}
                 </td>
                 <td
-                  className="px-3 py-2 text-right font-mono tabular-nums text-muted-foreground"
+                  className={cn(
+                    "px-3 py-2 text-right font-mono tabular-nums",
+                    row.review_flag ? "text-foreground font-medium" : "text-muted-foreground",
+                  )}
                   title={`Rank ${rank} of ${denom.toLocaleString("en-IN")}`}
                 >
                   {percentileStr}
                 </td>
                 <td className="px-3 py-2">
-                  <BandBadge band={band} />
+                  <BandBadge band={band} isFlagged={row.review_flag} />
                 </td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   <span

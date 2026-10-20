@@ -153,7 +153,7 @@ export function ExplainPanel({
                         {mInfo ? `#${mInfo.global_rank.toLocaleString("en-IN")}` : "—"}
                       </td>
                       <td className="px-2.5 py-2 text-right font-mono tabular-nums">
-                        {mInfo ? `Top ${mInfo.percentile.toFixed(1)}%` : "—"}
+                        {mInfo ? `Top ${mInfo.percentile.toFixed(2)}%` : "—"}
                       </td>
                       <td className="px-2.5 py-2 text-right font-mono tabular-nums text-muted-foreground">
                         {mInfo ? mInfo.score.toFixed(3) : "—"}

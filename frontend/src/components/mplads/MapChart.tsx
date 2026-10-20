@@ -215,7 +215,11 @@ export function MapChart({
         <div>
           <h3 className="text-sm font-semibold tracking-tight">Geographic Distribution of Sanctioned Works</h3>
           <p className="text-xs text-muted-foreground">
-            Bubble size = number of works. Colour & value = flagged share at top {flagPct}% cutoff of {methodName}.
+            {bubbleMetric === "flagged_count"
+              ? "Colour = flagged share (%); number = flagged works"
+              : bubbleMetric === "flagged_share"
+              ? "Colour and number = flagged share (%)"
+              : "Number = total works; colour = flagged share (%)"}
           </p>
         </div>
 
@@ -294,7 +298,7 @@ export function MapChart({
             </span>
             <span className="text-muted-foreground/60">|</span>
             <span>
-              Total Amount: <strong>{isMock ? "—" : formatINR(activeItem.total_amount)}</strong>
+              State total sanctioned: <strong>{isMock ? "—" : formatINR(activeItem.total_amount)}</strong>
             </span>
             <span className="text-muted-foreground/60">|</span>
             <span className="text-muted-foreground">

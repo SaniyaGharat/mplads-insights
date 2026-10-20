@@ -374,9 +374,9 @@ function Dashboard() {
   const rows = scores.data?.data.data ?? [];
   const total = scores.data?.data.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const flaggedCount = stats.data?.data
-    ? stats.data.data.label_counts.training_label + stats.data.data.label_counts.gat_top
-    : 62;
+  const cutoffScore = scores.data?.data.cutoff_score;
+  const thresholdRank = scores.data?.data.threshold_rank ?? Math.round(15000 * (flagPct / 100));
+  const flaggedCount = thresholdRank;
 
   const onLabel = (workIndex: number, value: LabelValue) => {
     if (isAnyMock || !labellingEnabled) return;
@@ -634,6 +634,59 @@ function Dashboard() {
                 </div>
               </div>
 
+              {/* Dynamic Review Cutoff Threshold Bar */}
+              <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border bg-secondary/30 px-5 py-2.5 text-xs">
+                <div className="flex flex-wrap items-center gap-4">
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Review Cutoff:
+                    </span>
+                    <span className="font-semibold text-foreground">Top {flagPct}%</span>
+                    <span className="text-muted-foreground font-mono">
+                      ({thresholdRank.toLocaleString("en-IN")} works)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Score Threshold:
+                    </span>
+                    <span className="font-mono font-semibold text-foreground">
+                      {currentMethod?.direction === "lower_is_riskier" ? "≤ " : "≥ "}
+                      {cutoffScore !== undefined ? cutoffScore.toFixed(3) : "—"}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Cutoff Band:
+                    </span>
+                    <span className="font-medium text-foreground">Top {flagPct}%</span>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <button
+                    onClick={() => {
+                      if (labelStatus === "FLAGGED") {
+                        setLabelStatus("");
+                      } else {
+                        setLabelStatus("FLAGGED");
+                      }
+                      setPage(1);
+                    }}
+                    className={cn(
+                      "cursor-pointer border px-2.5 py-1 text-xs font-medium transition-colors",
+                      labelStatus === "FLAGGED"
+                        ? "border-primary bg-primary text-primary-foreground font-semibold shadow-xs"
+                        : "border-border bg-card text-muted-foreground hover:bg-muted hover:text-foreground",
+                    )}
+                  >
+                    {labelStatus === "FLAGGED"
+                      ? `Viewing Top ${flagPct}% Flagged Only (${total.toLocaleString("en-IN")})`
+                      : `Filter to Top ${flagPct}% Cutoff Only (${thresholdRank.toLocaleString("en-IN")})`}
+                  </button>
+                </div>
+              </div>
+
               {/* Method Note Banner */}
               {methodNote && (
                 <div
@@ -804,6 +857,7 @@ function Dashboard() {
                       className="w-full border border-border bg-background px-2 py-1.5 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-ring"
                     >
                       <option value="">All Labels</option>
+                      <option value="FLAGGED">Flagged for Review (Top {flagPct}%)</option>
                       <option value="TRAINING LABEL">Training Label</option>
                       <option value="GAT-TOP">GAT-Top</option>
                       <option value="NEW">New</option>
@@ -908,6 +962,8 @@ function Dashboard() {
                   method={method}
                   direction={currentMethod?.direction}
                   flagPct={flagPct}
+                  cutoffScore={cutoffScore}
+                  thresholdRank={thresholdRank}
                   rowFeedback={rowFeedback}
                   onSelect={setSelected}
                   onLabel={onLabel}

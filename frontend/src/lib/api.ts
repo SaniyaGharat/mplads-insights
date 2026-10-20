@@ -235,6 +235,9 @@ export interface RiskScoresResponse {
   total: number;
   method?: string;
   method_note?: string;
+  flag_pct?: number;
+  threshold_rank?: number;
+  cutoff_score?: number;
 }
 
 export interface GraphNode {
@@ -349,6 +352,29 @@ export const DEFAULT_METHODS: MethodInfo[] = [
     note: "Experimental. Trained on synthetic fraud patterns, not validated on real fraud labels. A rank-ordering score, not a probability. It disagreed with analyst labels (see report).",
   },
 ];
+
+export const METHOD_THRESHOLDS: Record<ScoringMethod, Record<1 | 5 | 10, number>> = {
+  gat: {
+    1: 175.592,
+    5: 17.496,
+    10: 15.419,
+  },
+  siamese: {
+    1: 0.074,
+    5: 0.333,
+    10: 0.545,
+  },
+  community: {
+    1: 14.088,
+    5: 2.959,
+    10: 2.079,
+  },
+  fusion: {
+    1: 0.856,
+    5: 0.635,
+    10: 0.536,
+  },
+};
 
 export async function fetchMethods(): Promise<Sourced<MethodsResponse>> {
   try {
@@ -640,6 +666,11 @@ function mockRiskScores(
       review_flag: rank <= flagThreshold,
     };
   });
+  const mockCutoffScore =
+    method === "siamese"
+      ? Math.min(10.0, 0.05 + flagThreshold * 0.0005)
+      : Math.max(0.01, 0.995 - flagThreshold * 0.00006);
+
   return {
     data,
     page,
@@ -647,6 +678,9 @@ function mockRiskScores(
     total: MOCK_TOTAL,
     method,
     method_note: METHOD_NOTES[method] ?? "",
+    flag_pct: filters?.flag_pct ?? 5,
+    threshold_rank: flagThreshold,
+    cutoff_score: mockCutoffScore,
   };
 }
 
