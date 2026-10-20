@@ -913,13 +913,17 @@ function mockGeography(method: ScoringMethod, flagPct: 1 | 5 | 10): GeographyRes
   const total_works = 15000;
   const total_flagged = Math.round(total_works * (flagPct / 100));
 
+  // Method seed modifier so mock mode also reflects method variation
+  const methodSeed = method === "siamese" ? 42 : method === "community" ? 89 : method === "fusion" ? 137 : 17;
+
   const states: StateGeoItem[] = STATES.map((state, sIdx) => {
     const numDistricts = 4;
     const districts: DistrictGeoItem[] = Array.from({ length: numDistricts }, (_, dIdx) => {
       // Deterministically create some small groups (<20 works) and normal groups
       const isSmall = (sIdx + dIdx) % 3 === 0;
       const dWorks = isSmall ? Math.round(5 + seeded(sIdx * 10 + dIdx) * 12) : Math.round(80 + seeded(sIdx * 10 + dIdx) * 300);
-      const dFlagged = Math.round(dWorks * (flagPct / 100) * (0.8 + seeded(sIdx * 7 + dIdx) * 0.4));
+      const methodFactor = 0.65 + seeded(sIdx * 11 + dIdx + methodSeed) * 0.7;
+      const dFlagged = Math.min(dWorks, Math.max(0, Math.round(dWorks * (flagPct / 100) * methodFactor)));
       const distName = `${state}_Dist_${dIdx + 1}`;
       return {
         district: distName,

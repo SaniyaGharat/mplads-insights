@@ -468,45 +468,6 @@ export function EvaluationTab() {
               </table>
             </div>
           )}
-
-          {/* Baseline Selection & Hindsight Caveat */}
-          <div className="mt-4 rounded border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-900 dark:text-amber-200 space-y-1.5">
-            <div className="font-semibold text-amber-800 dark:text-amber-300 flex items-center gap-1.5">
-              <span>⚠️</span> Baseline Selection & Hindsight Caveat:
-            </div>
-            <p>
-              On the pooled six families every fusion model was significantly below the hindsight-best detector. Only on strictly unseen F, G, H did the gradient-boosted model beat both baselines (mean AUPRC +0.025, 95% CI +0.008 to +0.047).
-            </p>
-          </div>
-        </div>
-      </div>
-
-      {/* Section 3: Limitations Box */}
-      <div className="border border-border bg-card p-5">
-        <div className="flex items-start gap-3">
-          <span className="text-lg leading-none mt-0.5" aria-hidden="true">
-            📋
-          </span>
-          <div className="space-y-3">
-            <div>
-              <h3 className="text-sm font-semibold">
-                Methodological Limitations & Audit Usage Notice
-              </h3>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                Crucial caveats regarding score interpretation, benchmark boundaries, and domain applicability:
-              </p>
-            </div>
-            <ul className="space-y-2 text-xs text-foreground/80 list-disc list-inside">
-              {data.limitations.map((lim, idx) => (
-                <li key={idx} className="leading-relaxed">
-                  {lim}
-                </li>
-              ))}
-            </ul>
-            <div className="border-t border-border/60 pt-3 text-[11px] text-muted-foreground italic">
-              Notice: Model scores and triage flags are intended solely for exploratory audit prioritisation and workflow triage. They do not constitute findings of administrative misconduct or ground truth determinations.
-            </div>
-          </div>
         </div>
       </div>
     </div>
