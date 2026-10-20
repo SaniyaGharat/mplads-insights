@@ -38,7 +38,10 @@ def test_risk_scores_unfiltered_defaults():
         bm.DATA["gat_scores"] = np.load("ml/gat_scores.npy")
 
     response = asyncio.run(bm.get_risk_scores())
-    assert set(response.keys()) == {"data", "page", "page_size", "total", "method", "method_note"}
+    assert set(response.keys()) == {
+        "data", "page", "page_size", "total", "method", "method_note",
+        "flag_pct", "threshold_rank", "cutoff_score"
+    }
     assert response["total"] == 15000
     assert response["page"] == 1
     assert response["page_size"] == 50
@@ -73,6 +76,23 @@ def test_risk_scores_flag_pct():
     res_page4 = asyncio.run(bm.get_risk_scores(page=4, page_size=50, flag_pct=1))
     assert res_page4["data"][1]["global_rank"] == 152
     assert res_page4["data"][1]["review_flag"] is False
+
+
+def test_cutoff_score_all_methods_all_cutoffs():
+    import backend.main as bm
+    import numpy as np
+
+    if "df_works" not in bm.DATA or "siamese_scores" not in bm.DATA:
+        asyncio.run(bm.startup_event())
+
+    for method in ["gat", "siamese", "community", "fusion"]:
+        for pct in [1, 5, 10]:
+            res = asyncio.run(bm.get_risk_scores(method=method, flag_pct=pct))
+            assert "cutoff_score" in res
+            assert isinstance(res["cutoff_score"], (int, float))
+            assert not np.isnan(res["cutoff_score"])
+            assert res["flag_pct"] == pct
+            assert res["threshold_rank"] == int(15000 * (pct / 100.0))
 
 
 def test_work_compare_endpoint():

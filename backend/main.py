@@ -313,19 +313,33 @@ async def get_filter_options():
     }
 
 
+def _get_method_scores(method_name: str) -> np.ndarray:
+    score_key = f"{method_name}_scores"
+    if score_key in DATA:
+        return DATA[score_key]
+    if method_name == "gat" and os.path.exists("ml/gat_scores.npy"):
+        DATA["gat_scores"] = np.load("ml/gat_scores.npy")
+        return DATA["gat_scores"]
+    real_det_path = 'data/deploy/real_detector_scores.csv'
+    if method_name == "community" and os.path.exists(real_det_path):
+        DATA['community_scores'] = pd.read_csv(real_det_path)['community_score'].values
+        return DATA['community_scores']
+    real_fus_path = 'data/deploy/real_fusion_scores.csv'
+    if method_name == "fusion" and os.path.exists(real_fus_path):
+        DATA['fusion_scores'] = pd.read_csv(real_fus_path)['fusion_score'].values
+        return DATA['fusion_scores']
+    if "df_works" in DATA:
+        DATA[score_key] = np.zeros(len(DATA['df_works']))
+    else:
+        DATA[score_key] = np.zeros(15000)
+    return DATA[score_key]
+
+
 def _get_method_ranks(method_name: str) -> np.ndarray:
     cache_key = f"{method_name}_ranks"
     if cache_key in DATA:
         return DATA[cache_key]
-    score_key = f"{method_name}_scores"
-    if score_key not in DATA:
-        if method_name == "gat" and os.path.exists("ml/gat_scores.npy"):
-            DATA["gat_scores"] = np.load("ml/gat_scores.npy")
-        elif "df_works" in DATA:
-            DATA[score_key] = np.zeros(len(DATA['df_works']))
-        else:
-            DATA[score_key] = np.zeros(15000)
-    scores = DATA[score_key]
+    scores = _get_method_scores(method_name)
     if method_name == "siamese":
         sorted_indices = np.argsort(scores)
     else:
@@ -670,20 +684,18 @@ async def get_risk_scores(
     method_lower = method.lower()
     method_note = ""
 
+    scores = _get_method_scores(method_lower)
+
     if method_lower == "gat":
-        scores = DATA['gat_scores']
         sorted_indices = np.argsort(-scores)
         method_note = "Reconstruction error: flags statistically unusual works. Favours rare values; not evidence of misconduct."
     elif method_lower == "siamese":
-        scores = DATA['siamese_scores']
         sorted_indices = np.argsort(scores)
         method_note = "Similarity to 51 analyst-labelled works (drawn from GAT-ranked lists, so biased)."
     elif method_lower == "community":
-        scores = DATA['community_scores']
         sorted_indices = np.argsort(-scores)
         method_note = "Several MPs sanctioning similar amounts at one agency within 30 days. Round-sum coincidences are common."
     elif method_lower == "fusion":
-        scores = DATA['fusion_scores']
         sorted_indices = np.argsort(-scores)
         method_note = "Experimental. Trained on synthetic fraud patterns, not validated on real fraud labels. A rank-ordering score, not a probability. It disagreed with analyst labels (see report)."
     else:
@@ -704,6 +716,7 @@ async def get_risk_scores(
     if flag_pct not in (1, 5, 10):
         flag_pct = 5
     threshold_rank = int(len(scores) * (flag_pct / 100.0))
+    cutoff_score = float(scores[sorted_indices[threshold_rank - 1]])
 
     # Labels logic
     labeled_indices = set(DATA['labels_df']['work_index'].tolist())
@@ -791,7 +804,10 @@ async def get_risk_scores(
         "page_size": page_size,
         "total": total,
         "method": method_lower,
-        "method_note": method_note
+        "method_note": method_note,
+        "flag_pct": flag_pct,
+        "threshold_rank": threshold_rank,
+        "cutoff_score": cutoff_score,
     }
 
 

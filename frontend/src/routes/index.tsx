@@ -19,6 +19,7 @@ import {
   type RiskRow,
   type ScoringMethod,
   type RiskScoresFilterParams,
+  METHOD_THRESHOLDS,
 } from "@/lib/api";
 import { API_BASE_URL } from "@/lib/config";
 import { cn } from "@/lib/utils";
@@ -374,7 +375,9 @@ function Dashboard() {
   const rows = scores.data?.data.data ?? [];
   const total = scores.data?.data.total ?? 0;
   const pageCount = Math.max(1, Math.ceil(total / PAGE_SIZE));
-  const cutoffScore = scores.data?.data.cutoff_score;
+  const cutoffScore =
+    scores.data?.data.cutoff_score ??
+    METHOD_THRESHOLDS[method as ScoringMethod]?.[flagPct as 1 | 5 | 10];
   const thresholdRank = scores.data?.data.threshold_rank ?? Math.round(15000 * (flagPct / 100));
   const flaggedCount = thresholdRank;
 
@@ -653,6 +656,7 @@ function Dashboard() {
                     <span className="font-mono font-semibold text-foreground">
                       {currentMethod?.direction === "lower_is_riskier" ? "≤ " : "≥ "}
                       {cutoffScore !== undefined ? cutoffScore.toFixed(3) : "—"}
+                      {currentMethod?.direction === "lower_is_riskier" ? " distance" : ""}
                     </span>
                   </div>
                   <div className="flex items-center gap-1.5">
